@@ -134,9 +134,10 @@ no manual configuration.
 
 Free-tier limits to plan around:
 
-- **No persistent disk.** The SQLite file lives on the instance's ephemeral disk, so
-  every deploy or restart wipes trainer accounts, participants, answers and scores.
-  Seeded sessions and question banks come back automatically. Download certificates
+- **No persistent disk.** The instance disk is ephemeral, so every deploy or restart
+  resets the database to the copy committed in `data/daily-quiz.sqlite` (trainer
+  accounts and edited sessions survive; participants, answers and scores do not).
+  Commit the file again after changing accounts or questions locally. Download certificates
   and check scorecards before the session ends. For durable data upgrade the service
   to a paid instance, attach a disk and set `DB_PATH` (see the comments in
   `render.yaml`).

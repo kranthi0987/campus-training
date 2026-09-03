@@ -1,6 +1,7 @@
 // Entry point: serves the pages and the API on the LAN.
 import http from 'node:http';
 import os from 'node:os';
+import { pathToFileURL } from 'node:url';
 import { openDb } from './db.js';
 import { Auth, DEFAULT_PASSWORD } from './auth.js';
 import { Live, LiveError } from './live.js';
@@ -63,7 +64,9 @@ export async function createApp({ dbPath, publicUrl } = {}) {
   return { server, db, live, auth, decks, seeded, setPublicUrl: (u) => { api.publicUrl = u; } };
 }
 
-const isMain = process.argv[1] && import.meta.url === new URL(`file:///${process.argv[1].replace(/\\/g, '/')}`).href;
+// pathToFileURL handles both Windows drive paths and Linux absolute paths (a hand-built
+// `file:///${path}` gets four slashes on Linux and never matches, so nothing would start).
+const isMain = Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
   const port = Number(process.env.PORT) || 3000;
   const host = process.env.HOST || '0.0.0.0';

@@ -1,5 +1,5 @@
 node_modules/
-data/
-*.sqlite
+data/*
+!data/daily-quiz.sqlite
 *.sqlite-wal
 *.sqlite-shm
