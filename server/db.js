@@ -112,6 +112,8 @@ function migrate(db) {
   if (!cols.includes('reveal')) db.exec("ALTER TABLE sessions ADD COLUMN reveal TEXT NOT NULL DEFAULT 'end'");
   if (!cols.includes('block_end')) db.exec('ALTER TABLE sessions ADD COLUMN block_end INTEGER');
   if (!cols.includes('trainer_emails')) db.exec("ALTER TABLE sessions ADD COLUMN trainer_emails TEXT NOT NULL DEFAULT '[]'");
+  // Per-session quiz checkpoints: JSON {"<slide index>": questions}; NULL = the deck's own askAfter values.
+  if (!cols.includes('checkpoints')) db.exec('ALTER TABLE sessions ADD COLUMN checkpoints TEXT');
   const tcols = db.prepare('PRAGMA table_info(trainers)').all().map((c) => c.name);
   if (!tcols.includes('role')) db.exec("ALTER TABLE trainers ADD COLUMN role TEXT NOT NULL DEFAULT 'trainer'");
   // Roles arrived after the first release: the earliest account becomes the admin.
@@ -135,6 +137,7 @@ export function rowToSession(r) {
     questionClosed: !!r.question_closed, startedAt: r.started_at, endsAt: r.ends_at, endedAt: r.ended_at,
     slideIndex: r.slide_index, slideStep: r.slide_step ?? 0, reveal: r.reveal || 'end',
     blockEnd: r.block_end ?? null,
+    checkpoints: r.checkpoints ? JSON.parse(r.checkpoints) : null,
   };
 }
 

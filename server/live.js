@@ -101,7 +101,7 @@ export class Live {
   /** The deck to present: the seeded slides, or a content page built from the session's subtopics. */
   deckForSession(s) {
     const real = s.slidesKey ? this.decks.get(s.slidesKey) : null;
-    if (real) return real;
+    if (real) return applyCheckpoints(real, s.checkpoints);
     const topics = String(s.subtopics || '').split(',').map((t) => t.trim()).filter(Boolean);
     return {
       key: `session-${s.id}`, title: s.title, synthetic: true,
@@ -655,6 +655,26 @@ export class Live {
 /** Number of build steps on a slide: one per bullet, none when the slide is a picture. */
 export function stepsOf(sl) {
   return sl && sl.build !== false ? (sl.bullets || []).length : 0;
+}
+
+/**
+ * A session's own checkpoints ({"<flat slide index>": questions}) replace the deck's askAfter values
+ * wholesale; null keeps the deck as authored.
+ */
+export function applyCheckpoints(deck, checkpoints) {
+  if (!checkpoints || typeof checkpoints !== 'object') return deck;
+  let flat = 0;
+  return {
+    ...deck,
+    sections: (deck.sections || []).map((sec) => ({
+      ...sec,
+      slides: (sec.slides || []).map((sl) => {
+        const n = Number(checkpoints[flat++]) || 0;
+        const { askAfter, ...rest } = sl;
+        return n > 0 ? { ...rest, askAfter: n } : rest;
+      }),
+    })),
+  };
 }
 
 export function flattenDeck(deck) {

@@ -199,12 +199,30 @@ export function createApi({ db, live, auth, decks, publicUrl }) {
     const trainerEmails = user.role === 'admin' && b.trainerEmails !== undefined ? cleanEmails(b.trainerEmails) : s.trainerEmails;
     const reveal = b.reveal === undefined ? s.reveal : String(b.reveal);
     if (!['end', 'each'].includes(reveal)) throw new HttpError(400, 'reveal must be "end" or "each"');
+    // Quiz checkpoints: {"<slide index>": questions to ask after that slide}; null returns to the deck's own.
+    let checkpoints = s.checkpoints;
+    if (b.checkpoints !== undefined) {
+      if (b.checkpoints === null) checkpoints = null;
+      else {
+        if (typeof b.checkpoints !== 'object' || Array.isArray(b.checkpoints)) throw new HttpError(400, 'checkpoints must be an object of slide index to question count, or null');
+        const slides = flattenDeck(live.deckForSession({ ...s, checkpoints: null })).length;
+        const questionCount = live.questions(id).length;
+        checkpoints = {};
+        for (const [k, v] of Object.entries(b.checkpoints)) {
+          const slide = Number(k), n = Number(v);
+          if (!Number.isInteger(slide) || slide < 0 || slide >= slides) throw new HttpError(400, `No slide ${k} in this deck (it has ${slides})`);
+          if (!Number.isInteger(n) || n < 0 || n > Math.max(1, questionCount)) throw new HttpError(400, `Slide ${slide + 1}: questions must be between 0 and ${questionCount}`);
+          if (n > 0) checkpoints[slide] = n;
+        }
+      }
+    }
     db.prepare(
-      `UPDATE sessions SET title = ?, date = ?, module = ?, subtopics = ?, trainers = ?, trainer_emails = ?, time_limit_min = ?, easy_s = ?, medium_s = ?, hard_s = ?, reveal = ? WHERE id = ?`,
+      `UPDATE sessions SET title = ?, date = ?, module = ?, subtopics = ?, trainers = ?, trainer_emails = ?, time_limit_min = ?, easy_s = ?, medium_s = ?, hard_s = ?, reveal = ?, checkpoints = ? WHERE id = ?`,
     ).run(
       String(b.title ?? s.title).trim() || s.title, b.date === undefined ? s.date : String(b.date).slice(0, 10), b.module === undefined ? s.module : String(b.module).trim(),
       b.subtopics === undefined ? s.subtopics : String(b.subtopics).trim(), JSON.stringify(trainers), JSON.stringify(trainerEmails),
-      num(b.timeLimitMin, 1, 600, s.timeLimitMin), num(b.easyS, 5, 600, s.easyS), num(b.mediumS, 5, 600, s.mediumS), num(b.hardS, 5, 600, s.hardS), reveal, id,
+      num(b.timeLimitMin, 1, 600, s.timeLimitMin), num(b.easyS, 5, 600, s.easyS), num(b.mediumS, 5, 600, s.mediumS), num(b.hardS, 5, 600, s.hardS), reveal,
+      checkpoints === null ? null : JSON.stringify(checkpoints), id,
     );
     live.broadcast(id);
     sendJson(res, 200, { session: live.session(id) });

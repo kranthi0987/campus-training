@@ -70,6 +70,12 @@ the QR code, if auto-detection picks the wrong network adapter), `DB_PATH` (defa
    run from the host screen, and *Show scoreboard* ends the session. To load a changed
    bank into an existing database: stop the server and run
    `node scripts/reload-session.mjs day09-python`.
+   Trainers can place their own checkpoints without touching the deck file: the session
+   page has a **Quiz checkpoints** card (for sessions with a deck) listing every slide with
+   a box for how many questions to ask after it. *Save checkpoints* stores the map on the
+   session and replaces the deck's `askAfter` values wholesale; *Use deck defaults* goes
+   back to the authored ones. Questions are always consumed in list order, so reorder the
+   question list to decide which questions land in which block.
    The slides themselves are shown as pictures exported from the PowerPoint file
    (`public/decks/day09-python/slide-01.png` … `slide-16.png`, 1920×1080), so every image,
    layout and colour matches the original; the text in the deck file becomes the trainer's

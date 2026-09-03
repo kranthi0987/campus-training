@@ -3,9 +3,10 @@ import { $, $$, api, html, raw, pill, toast, fmtDate } from '/app.js';
 const app = $('#app');
 let trainer = null;
 let sessions = [];
-let current = null;      // { session, questions }
+let current = null;      // { session, questions, deck }
 let editing = null;      // question being edited (object) or null for new
 let draft = null;        // editor form state
+let cpDraft = null;      // unsaved quiz checkpoints { slideIndex: questions }, null = nothing pending
 
 window.addEventListener('hashchange', route);
 init();
@@ -342,8 +343,11 @@ async function newSession() {
 
 // ---------------------------------------------------------------- builder
 async function openSession(id) {
-  try { current = await api(`/api/sessions/${id}`); }
-  catch (err) { toast(err.message, { error: true }); location.hash = '#/sessions'; return; }
+  try {
+    current = await api(`/api/sessions/${id}`);
+    current.deck = current.session.hasSlides ? (await api(`/api/sessions/${id}/deck`)).deck : null;
+  } catch (err) { toast(err.message, { error: true }); location.hash = '#/sessions'; return; }
+  cpDraft = null;
   editing = current.questions[0] || null;
   draft = editing ? fromQuestion(editing) : blankDraft();
   renderBuilder();
@@ -394,6 +398,39 @@ function renderBuilder() {
       </div>
     </div>`;
 
+  // Quiz checkpoints: how many questions to run after each slide (questions are taken in list order).
+  let checkpointsCard = '';
+  if (current.deck) {
+    const slides = current.deck.slides;
+    const saved = Object.fromEntries(slides.map((sl, i) => [i, sl.askAfter || 0]).filter(([, n]) => n));
+    const cps = cpDraft || saved;
+    const placed = Object.values(cps).reduce((a, b) => a + b, 0);
+    const custom = s.checkpoints !== null;
+    let lastSection = null;
+    checkpointsCard = html`
+      <div class="card stack" style="gap: 12px;">
+        <div class="row between wrap" style="gap: 8px;">
+          <div class="row" style="gap: 8px; align-items: baseline;"><h3>Quiz checkpoints</h3><span class="tiny muted">${custom ? 'custom for this session' : 'as authored in the deck'}</span></div>
+          <div class="row" style="gap: 6px;">
+            ${custom && !cpDraft ? html`<button class="btn sm" id="cpReset">Use deck defaults</button>` : ''}
+            ${cpDraft ? html`<button class="btn sm ghost" id="cpCancel">Cancel</button><button class="btn sm dark" id="cpSave">Save checkpoints</button>` : ''}
+          </div>
+        </div>
+        <div class="wash row" style="gap: 8px;">${raw(icon('info'))}<span>Type how many questions to ask right after a slide. Questions run in list order: the first checkpoint gets questions 1 to N and the next one continues from there. ${placed ? html`<strong>${Math.min(placed, qs.length)} of ${qs.length}</strong> placed during the slides; ${qs.length > placed ? `the remaining ${qs.length - placed} run from the host screen at the end.` : 'nothing is left for the end.'}` : 'None placed yet: the whole quiz runs from the host screen at the end.'}${placed > qs.length ? html` <strong style="color: var(--hard);">${placed - qs.length} more than the session has; the last checkpoints will ask nothing.</strong>` : ''}</span></div>
+        <div class="stack" style="gap: 0; max-height: 420px; overflow: auto; border: 1px solid var(--line-soft); border-radius: 8px;">
+          ${slides.map((sl, i) => {
+            const head = sl.sectionId !== lastSection ? html`<div class="tiny muted" style="padding: 8px 12px 4px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; background: var(--wash);">${sl.sectionTitle}</div>` : '';
+            lastSection = sl.sectionId;
+            const n = cps[i] || 0;
+            return html`${head}<div class="row between" style="gap: 10px; padding: 6px 12px; border-top: 1px solid var(--line-soft); ${n ? 'background: #f2f8fd;' : ''}">
+              <span class="small" style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><span class="muted">${i + 1}.</span> ${sl.title}</span>
+              <span class="row" style="gap: 6px; flex: none;"><input class="input" data-cp="${i}" type="number" min="0" max="${qs.length}" value="${n || ''}" placeholder="0" style="width: 64px; height: 32px; padding: 0 8px; font-weight: 700; text-align: center;"><span class="tiny muted" style="width: 62px;">${n ? `question${n === 1 ? '' : 's'} after` : ''}</span></span>
+            </div>`;
+          })}
+        </div>
+      </div>`;
+  }
+
   shell(html`
     <div class="row between wrap" style="margin-bottom: 20px; gap: 12px;">
       <div class="stack" style="gap: 2px;">
@@ -443,6 +480,7 @@ function renderBuilder() {
           </div>
           <div class="wash row" style="gap: 8px;">${raw(icon('info'))}<span>Scoring is fixed: 100 points for a correct answer, 0 for a wrong one.</span></div>
         </div>
+        ${raw(checkpointsCard)}
         <div class="card" style="padding: 0; overflow: hidden;">
           <div class="row between wrap" style="padding: 14px 16px 10px; border-bottom: 1px solid var(--line-soft); gap: 8px;">
             <div class="row" style="gap: 8px; align-items: baseline;"><h3 style="white-space: nowrap;">Questions</h3><span class="tiny muted" style="white-space: nowrap;">${qs.length} · ~${Math.round(totalSeconds / 60)} min</span></div>
@@ -458,6 +496,18 @@ function renderBuilder() {
   $$('[data-limit]').forEach((b) => b.addEventListener('click', () => saveSettings({ timeLimitMin: Math.max(1, s.timeLimitMin + Number(b.dataset.limit)) })));
   $$('[data-default]').forEach((inp) => inp.addEventListener('change', () => saveSettings({ [inp.dataset.default + 'S']: Number(inp.value) })));
   $$('[data-reveal]').forEach((b) => b.addEventListener('click', () => saveSettings({ reveal: b.dataset.reveal })));
+  // checkpoints
+  $$('[data-cp]').forEach((inp) => inp.addEventListener('change', () => {
+    const slides = current.deck.slides;
+    const base = cpDraft || Object.fromEntries(slides.map((sl, i) => [i, sl.askAfter || 0]).filter(([, n]) => n));
+    const n = Math.max(0, Math.min(qs.length, Number(inp.value) || 0));
+    cpDraft = { ...base };
+    if (n) cpDraft[inp.dataset.cp] = n; else delete cpDraft[inp.dataset.cp];
+    renderBuilder();
+  }));
+  $('#cpSave')?.addEventListener('click', () => saveCheckpoints(cpDraft));
+  $('#cpCancel')?.addEventListener('click', () => { cpDraft = null; renderBuilder(); });
+  $('#cpReset')?.addEventListener('click', () => saveCheckpoints(null));
   $('#newCode').addEventListener('click', async () => { if (!confirm('Generate a new join code? Anyone using the old one will have to re-enter it.')) return; current.session = (await api(`/api/sessions/${s.id}/code`, { method: 'POST' })).session; renderBuilder(); });
   $('#editMeta').addEventListener('click', editMeta);
   // list
@@ -475,6 +525,17 @@ function renderBuilder() {
     try { current.questions = (await api(`/api/questions/${editing.id}`, { method: 'DELETE' })).questions; editing = current.questions[0] || null; draft = editing ? fromQuestion(editing) : blankDraft(); renderBuilder(); }
     catch (err) { toast(err.message, { error: true }); }
   });
+}
+
+async function saveCheckpoints(checkpoints) {
+  try {
+    const { session } = await api(`/api/sessions/${current.session.id}`, { method: 'PUT', body: { checkpoints } });
+    current.session = { ...current.session, ...session };
+    current.deck = (await api(`/api/sessions/${current.session.id}/deck`)).deck;
+    cpDraft = null;
+    renderBuilder();
+    toast(checkpoints === null ? 'Back to the deck\'s own checkpoints' : 'Checkpoints saved');
+  } catch (err) { toast(err.message, { error: true }); }
 }
 
 async function saveSettings(patch) {
