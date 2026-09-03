@@ -44,6 +44,17 @@
     .joinbadge { border: 1px solid var(--ink-line); background: var(--ink-2); color: var(--on-ink-muted); border-radius: 999px; padding: 6px 14px; font-size: 13px; cursor: pointer; white-space: nowrap; }
     .joinbadge strong { color: var(--amber); letter-spacing: 0.1em; }
     .joinbadge:hover { border-color: var(--amber); }
+    .idle.welcome { justify-content: flex-start; padding: 40px 56px; }
+    .welcome .idle-grid { grid-template-columns: minmax(0, 1fr) 440px; align-items: start; }
+    .welcome .joincard.big img { max-width: 400px; }
+    .welcome .jcount { font-family: var(--display); font-weight: 800; font-size: 64px; line-height: 1; color: var(--amber); }
+    .welcome .names { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; max-height: 96px; overflow: auto; }
+    .welcome .chip { display: inline-block; padding: 5px 12px; border-radius: 999px; background: var(--ink-2); border: 1px solid var(--ink-line); font-size: 14px; color: var(--on-ink); white-space: nowrap; }
+    .welcome .chip.soft { color: var(--on-ink-muted); }
+    .welcome .plan { display: flex; flex-direction: column; gap: 6px; }
+    .welcome .plan .eyebrow { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--on-ink-faint); }
+    .sec button .qmark { float: right; font-size: 10px; font-weight: 700; color: var(--amber); margin-left: 6px; }
+    .sec button.on .qmark { color: var(--ink); }
     .joinoverlay { position: fixed; inset: 0; background: rgba(0, 27, 45, 0.82); display: flex; align-items: center; justify-content: center; z-index: 30; cursor: pointer; }
     .joinoverlay-inner { width: min(560px, 90vw); }
     .joinoverlay .joincard.big img { max-width: 420px; }

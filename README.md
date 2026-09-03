@@ -86,8 +86,12 @@ the QR code, if auto-detection picks the wrong network adapter), `DB_PATH` (defa
    `scripts/export-slides.ps1` (needs PowerPoint on the trainer laptop), which re-exports
    `slide-NN.png` files; any deck whose folder under `public/decks/<key>/` holds such files
    is shown the same way.
-8. **Present** (17 Sep, Integration / AI): `/present/<session id>` opens on
-   the agenda ("what we cover today"), then the deck with speaker notes. The right arrow
+8. **Present**: `/present/<session id>` opens on the join screen: the QR code and join
+   code large on the right, who has joined so far (live, as interns scan), the sections of
+   the day and where the quiz sits ("24 questions: 6 in the middle, after slides 4, 17, and
+   18 at the end"). Opening Present puts a draft session into the lobby, so interns can join
+   straight away; *Start presenting* runs the deck with speaker notes, and slides with a
+   checkpoint are marked in the sidebar. The right arrow
    reveals one point at a time, then moves to the next slide; the left arrow goes back;
    `A` shows every point on the current slide; `N` toggles notes; `F` toggles full screen
    (the sidebar disappears so the projector shows only the slide); `J` overlays the QR

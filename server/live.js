@@ -460,6 +460,8 @@ export class Live {
     const next = index === null || index === undefined ? -1 : Math.max(0, Math.min(flat.length - 1, Number(index) | 0));
     const max = next >= 0 ? stepsOf(flat[next]) : 0;
     const st = step === 'all' ? max : Math.max(0, Math.min(max, Number(step) | 0));
+    // Showing slides opens the room: interns can only join a session in the lobby.
+    if (s.status === 'draft') this.db.prepare("UPDATE sessions SET status = 'lobby' WHERE id = ?").run(id);
     this.db.prepare('UPDATE sessions SET slide_index = ?, slide_step = ? WHERE id = ?').run(next, st, id);
     this.broadcast(id);
     return this.snapshot(id, { host: true });

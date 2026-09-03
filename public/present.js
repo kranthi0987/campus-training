@@ -19,7 +19,13 @@ document.body.classList.add('training');
   try { ({ publicUrl } = await api('/api/info')); } catch { /* optional */ }
   try { ({ deck } = await api(`/api/sessions/${id}/deck`)); }
   catch (e) { app.innerHTML = html`<div class="idle"><h1>${e.status === 403 ? 'Not available' : 'No slides for this session'}</h1><p class="muted">${e.message}</p></div>`.value; return; }
-  connect(`/api/sessions/${id}/events`, (snap) => { state = snap; render(); });
+  let opening = false;
+  connect(`/api/sessions/${id}/events`, (snap) => {
+    state = snap;
+    // The opening screen shows the QR code, so the room must be open for interns to join.
+    if (snap.session.status === 'draft' && !opening) { opening = true; api(`/api/sessions/${id}/lobby`, { method: 'POST' }).catch(() => {}); }
+    render();
+  });
 })();
 
 // Full screen hides the sidebar so the projector shows only the slide.
@@ -105,7 +111,7 @@ function render() {
     <div class="stack" style="gap: 8px;"><img class="logo" src="/brand/logo-light.svg" alt="Ferguson"><span class="tiny muted">${deck.title}</span></div>
     ${deck.sections.map((sec) => {
       const start = deck.slides.findIndex((sl) => sl.sectionId === sec.id);
-      return html`<div class="sec"><div class="name">${sec.title}</div>${sec.slides.map((sl, k) => html`<button class="${start + k === i ? 'on' : ''}" data-jump="${start + k}">${sl.title}</button>`)}</div>`;
+      return html`<div class="sec"><div class="name">${sec.title}</div>${sec.slides.map((sl, k) => html`<button class="${start + k === i ? 'on' : ''}" data-jump="${start + k}">${sl.title}${sl.askAfter ? html`<span class="qmark" title="Quiz after this slide">${sl.askAfter} q</span>` : ''}</button>`)}</div>`;
     })}
     <div class="row wrap" style="gap: 6px; margin-top: 8px;"><a class="btn sm primary" href="/host/${s.id}">Go to quiz →</a><button class="btn sm" id="fsBtn">⛶ Full screen</button><button class="btn sm" data-join="1">Join code</button></div>
     <div class="tiny faint" style="margin-top: auto; line-height: 1.8;"><kbd>→</kbd> next point / slide · <kbd>←</kbd> back · <kbd>A</kbd> show all · <kbd>N</kbd> notes · <kbd>J</kbd> join code · <kbd>F</kbd> full screen · <kbd>Esc</kbd> stop</div>
@@ -119,16 +125,26 @@ function render() {
   } else if (s.status === 'ended') {
     main = html`<div class="idle"><h1>Session finished</h1><p class="muted">Scores, the answer review and ratings are on the host screen and on every intern's phone.</p><div class="row"><a class="btn primary" href="/host/${s.id}">Open scoreboard</a>${i >= 0 ? html`<button class="btn" data-jump="${i}">Keep showing slides</button>` : ''}</div></div>`;
   } else if (i < 0) {
-    main = html`<div class="idle">
+    // Join screen: the QR code, who has joined so far, what is coming and where the quiz sits.
+    const ps = state.participants || [];
+    const checkpoints = deck.slides.map((sl, k) => (sl.askAfter ? { n: k + 1, q: sl.askAfter } : null)).filter(Boolean);
+    const placed = Math.min(s.questionCount, checkpoints.reduce((a, c) => a + c.q, 0));
+    const quizPlan = !s.questionCount ? 'No quiz questions yet.'
+      : checkpoints.length ? `${s.questionCount} questions: ${placed} asked in the middle, after slide${checkpoints.length === 1 ? '' : 's'} ${checkpoints.map((c) => c.n).join(', ')}${s.questionCount > placed ? `, and ${s.questionCount - placed} at the end` : ''}.`
+      : `${s.questionCount} questions, all at the end. To ask some in the middle, set checkpoints on the session page.`;
+    main = html`<div class="idle welcome">
       <div class="idle-grid">
-        <div class="stack" style="gap: 20px; min-width: 0;">
-          <div class="eyebrow" style="color: var(--amber);">${s.module || ''} · ${s.title}</div>
-          <h1>${deck.title}</h1>
-          <p class="muted" style="font-size: 18px; max-width: 760px;">What we cover today, in order. Interns who have joined see each slide on their own device as you move through it. When the content is done, go to the quiz.</p>
-          <div class="agenda" style="width: 100%;">
-            ${agendaItems.map((a, k) => html`<div class="item reveal" style="animation-delay: ${k * 0.08}s;"><span class="n">${k + 1}</span><div><div class="t">${a.title}</div>${a.sub ? html`<div class="s">${a.sub}</div>` : ''}</div></div>`)}
+        <div class="stack" style="gap: 18px; min-width: 0;">
+          <div class="eyebrow" style="color: var(--amber);">${s.module || 'Session'}${s.trainers.length ? ` · ${s.trainers.join(' & ')}` : ''}</div>
+          <h1 style="font-size: 44px;">${s.title}</h1>
+          <div class="muted" style="font-size: 18px; margin-top: -8px;">${deck.title}</div>
+          <div class="joined">
+            <div class="row" style="align-items: baseline; gap: 12px;"><span class="jcount">${ps.length}</span><span class="muted" style="font-size: 18px;">${ps.length === 1 ? 'intern has' : 'interns have'} joined${ps.length ? '' : ' · scan the code to join'}</span></div>
+            ${ps.length ? html`<div class="names">${ps.map((p) => html`<span class="chip">${p.name}</span>`)}</div>` : ''}
           </div>
-          <div class="row wrap" style="margin-top: 8px; gap: 12px;"><button class="btn primary lg" data-jump="0">${deck.synthetic ? 'Show content on screen' : 'Start presenting'}</button><button class="btn lg" id="fsBtn2">⛶ Full screen</button><a class="btn lg" href="/host/${s.id}">Go to quiz →</a><span class="small muted">${s.participantCount} joined · ${total} slide${total === 1 ? '' : 's'}</span></div>
+          <div class="plan"><div class="eyebrow">Today</div><div class="row wrap" style="gap: 6px;">${agendaItems.map((a, k) => html`<span class="chip soft">${k + 1}. ${a.title}</span>`)}</div></div>
+          <div class="plan"><div class="eyebrow">Quiz</div><div class="small muted">${quizPlan}</div></div>
+          <div class="row wrap" style="margin-top: 4px; gap: 12px;"><button class="btn primary lg" data-jump="0">${deck.synthetic ? 'Show content on screen' : 'Start presenting'}</button><button class="btn lg" id="fsBtn2">⛶ Full screen</button><a class="btn lg" href="/host/${s.id}">Go to quiz →</a><span class="small muted">${total} slide${total === 1 ? '' : 's'}</span></div>
         </div>
         ${joinCard(s, { big: true })}
       </div>
