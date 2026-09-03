@@ -12,6 +12,7 @@ import { seedIfEmpty, loadSlideDecks } from './seed/index.js';
 import { createApi } from './api.js';
 import { HttpError, sendJson } from './http.js';
 import { createStatic } from './static.js';
+import { storeFromEnv, restoreSnapshot, startSnapshots } from './persist.js';
 
 export function lanAddress() {
   const candidates = [];
@@ -51,11 +52,15 @@ export function sessionSecret(dbPath = process.env.DB_PATH || 'data/daily-quiz.s
   } catch { return null; }
 }
 
-export async function createApp({ dbPath, publicUrl, secret } = {}) {
-  const db = openDb(dbPath);
-  const seeded = await seedIfEmpty(db, { log: (m) => console.log('  ' + m) });
+export async function createApp({ dbPath, publicUrl, secret, store = storeFromEnv(), snapshotMs } = {}) {
+  const file = dbPath || process.env.DB_PATH || 'data/daily-quiz.sqlite';
+  const log = (m) => console.log('  ' + m);
+  if (store) await restoreSnapshot(store, file, { log });
+  const db = openDb(file);
+  const persist = store && file !== ':memory:' ? startSnapshots(db, file, store, { intervalMs: snapshotMs, log }) : null;
+  const seeded = await seedIfEmpty(db, { log });
   const decks = await loadSlideDecks();
-  const auth = new Auth(db, { secret: secret || sessionSecret(dbPath) });
+  const auth = new Auth(db, { secret: secret || sessionSecret(file) });
   const live = new Live(db, { decks });
   const api = createApi({ db, live, auth, decks, publicUrl: publicUrl || '' });
   const serveStatic = createStatic();
@@ -82,7 +87,7 @@ export async function createApp({ dbPath, publicUrl, secret } = {}) {
     }
   });
 
-  return { server, db, live, auth, decks, seeded, setPublicUrl: (u) => { api.publicUrl = u; } };
+  return { server, db, live, auth, decks, seeded, persist, store, setPublicUrl: (u) => { api.publicUrl = u; } };
 }
 
 // pathToFileURL handles both Windows drive paths and Linux absolute paths (a hand-built
@@ -96,6 +101,17 @@ if (isMain) {
   console.log('Ferguson Training quiz starting…');
   const app = await createApp({ publicUrl });
   if (app.seeded.seeded) console.log(`Seeded ${app.seeded.sessions} sessions with ${app.seeded.questions} questions.`);
+  if (app.persist) {
+    // The host stops the instance with SIGTERM (deploys, spin-down): get the last changes out first.
+    const shutdown = async (signal) => {
+      console.log(`${signal}: saving the database snapshot before exit…`);
+      try { await app.persist.flush(); } catch { /* logged by persist */ }
+      app.persist.stop();
+      await app.store.close().catch(() => {});
+      process.exit(0);
+    };
+    for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => shutdown(sig));
+  }
   app.server.listen(port, host, () => {
     console.log('');
     console.log(`  Interns join at:   ${publicUrl}`);

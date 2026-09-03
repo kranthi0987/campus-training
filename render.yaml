@@ -1,7 +1,9 @@
 # Render Blueprint: https://render.com/docs/blueprint-spec
-# Free tier: the filesystem is ephemeral, so the SQLite database (and every trainer
-# account, participant and score) is wiped on each deploy or restart. The app re-seeds
-# the sessions and question banks automatically on an empty database.
+# Free tier: the filesystem is ephemeral, so the SQLite file on the instance is wiped on each
+# deploy, restart and idle spin-down. The free Postgres database below keeps a snapshot of it:
+# the app restores the snapshot at boot and saves a fresh one a few seconds after every change
+# (see server/persist.js). Free Postgres databases expire 30 days after creation; create a new
+# one (or upgrade it) before then and the next boot starts again from the committed file.
 services:
   - type: web
     name: ferguson-training-quiz
@@ -18,6 +20,12 @@ services:
       # deploys and restarts; without it a fresh secret is generated on every start.
       - key: SESSION_SECRET
         generateValue: true
+      # Durable copy of the database (server/persist.js). Remove this variable to run on the
+      # ephemeral disk alone.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ferguson-training-db
+          property: connectionString
       # PUBLIC_URL is taken from RENDER_EXTERNAL_URL automatically; set it here only
       # if you put a custom domain in front of the service.
       # - key: PUBLIC_URL
@@ -31,3 +39,9 @@ services:
     # envVars:
     #   - key: DB_PATH
     #     value: /var/data/daily-quiz.sqlite
+
+databases:
+  - name: ferguson-training-db
+    plan: free
+    databaseName: ferguson_training
+    user: ferguson_training

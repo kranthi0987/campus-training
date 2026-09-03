@@ -4,13 +4,16 @@
   "private": true,
   "description": "Ferguson Training daily quiz: trainer hosts a timed quiz, interns join from laptop or phone over the room Wi-Fi.",
   "type": "module",
-  "engines": { "node": ">=22.5" },
+  "engines": {
+    "node": ">=22.5"
+  },
   "scripts": {
     "start": "node server/index.js",
     "test": "node --test \"tests/**/*.test.js\"",
     "validate:questions": "node scripts/validate-questions.mjs"
   },
   "dependencies": {
+    "pg": "^8.23.0",
     "qrcode": "^1.5.4"
   }
 }
