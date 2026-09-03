@@ -29,7 +29,8 @@ netsh advfirewall firewall add rule name="Daily Quiz" dir=in action=allow protoc
 
 Optional environment variables: `PORT` (default 3000), `PUBLIC_URL` (the address encoded in
 the QR code, if auto-detection picks the wrong network adapter), `DB_PATH` (default
-`data/daily-quiz.sqlite`), `DEFAULT_TRAINER_PASSWORD` (default `Ferguson@2026`), `SESSION_SECRET`
+`data/daily-quiz.sqlite`), `DATABASE_URL` (a Postgres connection string; when set, the app uses
+Postgres instead of the SQLite file), `DEFAULT_TRAINER_PASSWORD` (default `Ferguson@2026`), `SESSION_SECRET`
 (signs trainer sign-in cookies; when unset a random one is kept in `data/.session-secret`, so
 sign-ins survive restarts either way).
 
@@ -148,21 +149,17 @@ no manual configuration.
 
 Free-tier limits to plan around:
 
-- **No persistent disk, so the database lives in Render Postgres.** The instance disk is
-  ephemeral (wiped on deploy, restart and after 15 idle minutes). A free Render Postgres
-  database ("campustraining", created in the dashboard) holds a snapshot of the SQLite
-  file: set the service's `DATABASE_URL` to the database's *internal* connection string and
-  the app restores the latest snapshot at boot, then stores a fresh one a few seconds after
-  every change and on shutdown (`server/persist.js`), so accounts, participants, answers
-  and scores survive. With no snapshot stored, the first boot starts from the committed
-  `data/daily-quiz.sqlite`. Only the hosted service may use the store: a laptop server
-  pointed at the same database would overwrite its snapshots. Free Postgres databases
-  expire 30 days after creation, so download a copy before then.
-  `scripts/snapshot.mjs download|upload|reset` works with the snapshot from your laptop
-  using the database's *external* connection string in `DATABASE_URL`. Download certificates
-  and check scorecards before the session ends. For durable data upgrade the service
-  to a paid instance, attach a disk and set `DB_PATH` (see the comments in
-  `render.yaml`).
+- **The hosted service runs on Render Postgres.** The instance disk is ephemeral (wiped on
+  deploy, restart and after 15 idle minutes), so the service's `DATABASE_URL` points at the
+  free Render Postgres database "campustraining" (set it to the database's *internal*
+  connection string in the dashboard). With `DATABASE_URL` set the app uses Postgres for
+  everything: accounts, sessions, questions, participants, answers, scores and ratings all
+  live there and survive any number of deploys. Without it (your laptop) the app uses the
+  SQLite file as before. Both backends run the same test suite. Free Postgres databases
+  expire 30 days after creation: create a new one before then and re-run the migration.
+  `scripts/migrate-sqlite-to-postgres.mjs <file> [--force]` copies a SQLite database into
+  the Postgres one (ids included); `scripts/reload-session.mjs` and
+  `scripts/assign-trainers.mjs` work on whichever backend `DATABASE_URL` selects.
 - **Sign-ins survive deploys.** `render.yaml` generates a `SESSION_SECRET` for the service; if
   the service was created before that line existed, add the variable once in the Render
   dashboard (any long random string). Without it every deploy signs all trainers out, and the
@@ -175,7 +172,7 @@ Free-tier limits to plan around:
 
 ```
 server/            Node server (no framework): http.js router, api.js routes, live.js session engine,
-                   db.js SQLite schema, auth.js accounts + roles, access.js session scoping,
+                   db.js schema + the SQLite/Postgres adapters, auth.js accounts + roles, access.js session scoping,
                    certificate.js + zip.js certificates, bulk.js paste parser
 server/seed/       schedule.js sessions; questions/<key>.js banks; slides/<key>.js decks
 public/            Pages: index (join), play, trainer, host, present + shared app.js / styles.css

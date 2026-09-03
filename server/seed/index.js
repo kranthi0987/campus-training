@@ -82,45 +82,46 @@ export function prepareDeck(deck, diagrams = {}, images = []) {
   return { ...deck, sections };
 }
 
-export function insertQuestions(db, sessionId, list, startPosition = 0) {
-  const stmt = db.prepare(
-    'INSERT INTO questions (session_id, position, text, options, answer, complexity, seconds, explanation, code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-  );
-  list.forEach((q, i) => {
-    stmt.run(sessionId, startPosition + i, q.text, JSON.stringify(q.options), q.answer, q.complexity || 'medium', q.seconds ?? null, q.explanation || '', q.code || null);
-  });
-}
-
-export function uniqueJoinCode(db) {
-  for (;;) {
-    const code = newJoinCode();
-    if (!db.prepare('SELECT 1 FROM sessions WHERE join_code = ?').get(code)) return code;
+/** Inserts in batches of rows per statement: one round trip per batch matters on a remote database. */
+export async function insertQuestions(db, sessionId, list, startPosition = 0) {
+  const BATCH = 40;
+  for (let at = 0; at < list.length; at += BATCH) {
+    const chunk = list.slice(at, at + BATCH);
+    const values = chunk.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
+    const params = chunk.flatMap((q, i) => [sessionId, startPosition + at + i, q.text, JSON.stringify(q.options), q.answer, q.complexity || 'medium', q.seconds ?? null, q.explanation || '', q.code || null]);
+    await db.run(`INSERT INTO questions (session_id, position, text, options, answer, complexity, seconds, explanation, code) VALUES ${values}`, ...params);
   }
 }
 
-export function seedRosterIfEmpty(db, { log = () => {} } = {}) {
-  const { n } = db.prepare('SELECT COUNT(*) AS n FROM roster').get();
+export async function uniqueJoinCode(db) {
+  for (;;) {
+    const code = newJoinCode();
+    if (!(await db.get('SELECT 1 FROM sessions WHERE join_code = ?', code))) return code;
+  }
+}
+
+export async function seedRosterIfEmpty(db, { log = () => {} } = {}) {
+  const { n } = (await db.get('SELECT COUNT(*) AS n FROM roster'));
   if (n > 0) return 0;
-  const stmt = db.prepare('INSERT INTO roster (email, name, created_at) VALUES (?, ?, ?)');
-  for (const r of roster) stmt.run(r.email.toLowerCase(), r.name, Date.now());
+  for (const r of roster) await db.run('INSERT INTO roster (email, name, created_at) VALUES (?, ?, ?)', r.email.toLowerCase(), r.name, Date.now());
   log(`seeded roster: ${roster.length} participants`);
   return roster.length;
 }
 
 export async function seedIfEmpty(db, { log = () => {} } = {}) {
-  const rosterCount = seedRosterIfEmpty(db, { log });
-  const { n } = db.prepare('SELECT COUNT(*) AS n FROM sessions').get();
+  const rosterCount = await seedRosterIfEmpty(db, { log });
+  const { n } = (await db.get('SELECT COUNT(*) AS n FROM sessions'));
   if (n > 0) return { seeded: false, rosterCount };
-  const insert = db.prepare(
-    `INSERT INTO sessions (key, day_no, date, week, module, title, subtopics, trainers, trainer_emails, join_code, slides_key)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  );
   let questions = 0;
   for (const s of schedule) {
-    const code = uniqueJoinCode(db);
-    const { lastInsertRowid } = insert.run(s.key, s.dayNo, s.date, s.week, s.module, s.title, s.subtopics, JSON.stringify(s.trainers), JSON.stringify(s.trainerEmails || []), code, s.slidesKey || null);
+    const code = await uniqueJoinCode(db);
+    const { lastInsertRowid } = await db.run(
+      `INSERT INTO sessions (key, day_no, date, week, module, title, subtopics, trainers, trainer_emails, join_code, slides_key)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      s.key, s.dayNo, s.date, s.week, s.module, s.title, s.subtopics, JSON.stringify(s.trainers), JSON.stringify(s.trainerEmails || []), code, s.slidesKey || null,
+    );
     const bank = await loadQuestionBank(s.key);
-    insertQuestions(db, Number(lastInsertRowid), bank);
+    await insertQuestions(db, Number(lastInsertRowid), bank);
     questions += bank.length;
     log(`seeded ${s.key}: ${bank.length} questions, code ${code}`);
   }

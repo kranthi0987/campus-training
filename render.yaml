@@ -1,8 +1,6 @@
 # Render Blueprint: https://render.com/docs/blueprint-spec
-# Free tier: the filesystem is ephemeral, so the SQLite file on the instance is wiped on each
-# deploy, restart and idle spin-down. A free Render Postgres database keeps a snapshot of it:
-# the app restores the snapshot at boot and saves a fresh one a few seconds after every change
-# (see server/persist.js).
+# Free tier: the filesystem is ephemeral (wiped on each deploy, restart and idle spin-down), so
+# the service keeps all its data in a Render Postgres database via DATABASE_URL.
 services:
   - type: web
     name: ferguson-training-quiz
@@ -19,9 +17,9 @@ services:
       # deploys and restarts; without it a fresh secret is generated on every start.
       - key: SESSION_SECRET
         generateValue: true
-      # Durable copy of the database (server/persist.js): the *internal* connection string of
-      # the Render Postgres database "campustraining", pasted in the dashboard (never committed).
-      # Remove the variable to run on the ephemeral disk alone.
+      # The *internal* connection string of the Render Postgres database "campustraining",
+      # pasted in the dashboard (never committed). Without it the app would fall back to a
+      # SQLite file on the ephemeral disk and lose everything on the next deploy.
       - key: DATABASE_URL
         sync: false
       # PUBLIC_URL is taken from RENDER_EXTERNAL_URL automatically; set it here only
@@ -40,4 +38,5 @@ services:
 
 # The Postgres database (free plan, created by hand in the dashboard as "campustraining") is not
 # managed here so a Blueprint sync never recreates it. Free Postgres expires 30 days after
-# creation: download the snapshot (scripts/snapshot.mjs) before then.
+# creation: create a new one before then and load it with scripts/migrate-sqlite-to-postgres.mjs
+# (from a pg_dump restore or the committed SQLite file).

@@ -46,33 +46,33 @@ export class Auth {
     this.secret = secret || randomBytes(32).toString('hex');
   }
 
-  count() {
-    return this.db.prepare('SELECT COUNT(*) AS n FROM trainers').get().n;
+  async count() {
+    return (await this.db.get('SELECT COUNT(*) AS n FROM trainers')).n;
   }
 
-  adminCount() {
-    return this.db.prepare("SELECT COUNT(*) AS n FROM trainers WHERE role = 'admin'").get().n;
+  async adminCount() {
+    return (await this.db.get("SELECT COUNT(*) AS n FROM trainers WHERE role = 'admin'")).n;
   }
 
-  get(emailRaw) {
-    return toUser(this.db.prepare('SELECT * FROM trainers WHERE email = ?').get(normalizeEmail(emailRaw)));
+  async get(emailRaw) {
+    return toUser((await this.db.get('SELECT * FROM trainers WHERE email = ?', normalizeEmail(emailRaw))));
   }
 
-  list() {
-    return this.db.prepare('SELECT * FROM trainers ORDER BY created_at, email').all().map(toUser);
+  async list() {
+    return (await this.db.all('SELECT * FROM trainers ORDER BY created_at, email')).map(toUser);
   }
 
   /**
    * Signs a trainer in. When no account exists yet, the default password creates the first
    * account as the admin. Returns { email, name, role, usingDefault } or null.
    */
-  login(emailRaw, password, name) {
+  async login(emailRaw, password, name) {
     const email = normalizeEmail(emailRaw);
     if (!isEmail(email) || typeof password !== 'string') return null;
-    const row = this.db.prepare('SELECT * FROM trainers WHERE email = ?').get(email);
+    const row = (await this.db.get('SELECT * FROM trainers WHERE email = ?', email));
     if (!row) {
-      if (this.count() > 0 || password !== DEFAULT_PASSWORD) return null;
-      const created = this.create({ email, name, role: 'admin', password });
+      if (await this.count() > 0 || password !== DEFAULT_PASSWORD) return null;
+      const created = await this.create({ email, name, role: 'admin', password });
       return { ...created, usingDefault: true };
     }
     if (!verifyPassword(password, row.password_hash)) return null;
@@ -80,52 +80,51 @@ export class Auth {
   }
 
   /** Creates an account (admin action). Throws HttpError on bad input. */
-  create({ email: emailRaw, name, role = 'trainer', password }) {
+  async create({ email: emailRaw, name, role = 'trainer', password }) {
     const email = normalizeEmail(emailRaw);
     if (!isEmail(email)) throw new HttpError(400, 'Enter a valid email');
     if (!ROLES.includes(role)) throw new HttpError(400, 'Role must be admin or trainer');
     const pw = typeof password === 'string' && password ? password : DEFAULT_PASSWORD;
     if (pw.length < 8) throw new HttpError(400, 'Password must be at least 8 characters');
-    if (this.db.prepare('SELECT 1 FROM trainers WHERE email = ?').get(email)) throw new HttpError(409, 'An account with this email already exists');
+    if ((await this.db.get('SELECT 1 FROM trainers WHERE email = ?', email))) throw new HttpError(409, 'An account with this email already exists');
     const cleanName = String(name || '').trim().slice(0, 60) || email.split('@')[0];
-    this.db.prepare('INSERT INTO trainers (email, name, role, password_hash, created_at) VALUES (?, ?, ?, ?, ?)')
-      .run(email, cleanName, role, hashPassword(pw), Date.now());
+    (await this.db.run('INSERT INTO trainers (email, name, role, password_hash, created_at) VALUES (?, ?, ?, ?, ?)', email, cleanName, role, hashPassword(pw), Date.now()));
     return { email, name: cleanName, role, usingDefault: pw === DEFAULT_PASSWORD };
   }
 
   /** Updates name, role and/or password (admin action). Returns the account. */
-  update(emailRaw, { name, role, password } = {}) {
+  async update(emailRaw, { name, role, password } = {}) {
     const email = normalizeEmail(emailRaw);
-    const row = this.db.prepare('SELECT * FROM trainers WHERE email = ?').get(email);
+    const row = (await this.db.get('SELECT * FROM trainers WHERE email = ?', email));
     if (!row) throw new HttpError(404, 'Trainer not found');
     if (role !== undefined && !ROLES.includes(role)) throw new HttpError(400, 'Role must be admin or trainer');
-    if (role === 'trainer' && row.role === 'admin' && this.adminCount() <= 1) throw new HttpError(400, 'Keep at least one admin');
+    if (role === 'trainer' && row.role === 'admin' && await this.adminCount() <= 1) throw new HttpError(400, 'Keep at least one admin');
     const cleanName = name === undefined ? row.name : String(name).trim().slice(0, 60) || row.name;
-    this.db.prepare('UPDATE trainers SET name = ?, role = ? WHERE email = ?').run(cleanName, role ?? row.role, email);
+    (await this.db.run('UPDATE trainers SET name = ?, role = ? WHERE email = ?', cleanName, role ?? row.role, email));
     if (password !== undefined && password !== null && password !== '') {
       if (typeof password !== 'string' || password.length < 8) throw new HttpError(400, 'Password must be at least 8 characters');
-      this.db.prepare('UPDATE trainers SET password_hash = ? WHERE email = ?').run(hashPassword(password), email);
-      this.db.prepare('DELETE FROM trainer_tokens WHERE email = ?').run(email);
+      (await this.db.run('UPDATE trainers SET password_hash = ? WHERE email = ?', hashPassword(password), email));
+      (await this.db.run('DELETE FROM trainer_tokens WHERE email = ?', email));
     }
-    return this.get(email);
+    return await this.get(email);
   }
 
-  remove(emailRaw) {
+  async remove(emailRaw) {
     const email = normalizeEmail(emailRaw);
-    const row = this.db.prepare('SELECT * FROM trainers WHERE email = ?').get(email);
+    const row = (await this.db.get('SELECT * FROM trainers WHERE email = ?', email));
     if (!row) throw new HttpError(404, 'Trainer not found');
-    if (row.role === 'admin' && this.adminCount() <= 1) throw new HttpError(400, 'Keep at least one admin');
-    this.db.prepare('DELETE FROM trainer_tokens WHERE email = ?').run(email);
-    this.db.prepare('DELETE FROM trainers WHERE email = ?').run(email);
+    if (row.role === 'admin' && await this.adminCount() <= 1) throw new HttpError(400, 'Keep at least one admin');
+    (await this.db.run('DELETE FROM trainer_tokens WHERE email = ?', email));
+    (await this.db.run('DELETE FROM trainers WHERE email = ?', email));
     return { removed: email };
   }
 
-  changePassword(emailRaw, current, next) {
+  async changePassword(emailRaw, current, next) {
     const email = normalizeEmail(emailRaw);
-    const row = this.db.prepare('SELECT * FROM trainers WHERE email = ?').get(email);
+    const row = (await this.db.get('SELECT * FROM trainers WHERE email = ?', email));
     if (!row || !verifyPassword(current, row.password_hash)) return false;
     if (typeof next !== 'string' || next.length < 8) return false;
-    this.db.prepare('UPDATE trainers SET password_hash = ? WHERE email = ?').run(hashPassword(next), email);
+    (await this.db.run('UPDATE trainers SET password_hash = ? WHERE email = ?', hashPassword(next), email));
     return true;
   }
 
@@ -135,8 +134,8 @@ export class Auth {
    * restarts and redeploys (the database is wiped on every deploy on the free hosting tier) as
    * long as the secret is the same, and die when the password changes or the account is removed.
    */
-  issueToken(email) {
-    const row = this.db.prepare('SELECT password_hash FROM trainers WHERE email = ?').get(email);
+  async issueToken(email) {
+    const row = (await this.db.get('SELECT password_hash FROM trainers WHERE email = ?', email));
     if (!row) return null;
     const payload = Buffer.from(JSON.stringify({ e: email, t: Date.now(), p: fingerprint(row.password_hash) })).toString('base64url');
     return `${payload}.${this.sign(payload)}`;
@@ -146,31 +145,29 @@ export class Auth {
     return createHmac('sha256', this.secret).update(payload).digest('base64url');
   }
 
-  trainerForToken(token) {
+  async trainerForToken(token) {
     if (!token) return null;
     const dot = String(token).indexOf('.');
-    if (dot < 0) return this.legacyTrainerForToken(token);
+    if (dot < 0) return await this.legacyTrainerForToken(token);
     const payload = token.slice(0, dot), sig = token.slice(dot + 1);
     const expected = this.sign(payload);
     if (sig.length !== expected.length || !timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
     let data;
     try { data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')); } catch { return null; }
     if (!data || typeof data.e !== 'string' || !(Date.now() - Number(data.t) < TOKEN_TTL_MS)) return null;
-    const row = this.db.prepare('SELECT email, name, role, password_hash FROM trainers WHERE email = ?').get(data.e);
+    const row = (await this.db.get('SELECT email, name, role, password_hash FROM trainers WHERE email = ?', data.e));
     if (!row || fingerprint(row.password_hash) !== data.p) return null;
     return { email: row.email, name: row.name, role: row.role || 'trainer' };
   }
 
   /** Cookies issued before signed tokens: rows in trainer_tokens, valid until the next deploy. */
-  legacyTrainerForToken(token) {
-    const row = this.db.prepare(
-      'SELECT t.email, t.name, t.role FROM trainer_tokens k JOIN trainers t ON t.email = k.email WHERE k.token = ?',
-    ).get(token);
+  async legacyTrainerForToken(token) {
+    const row = (await this.db.get('SELECT t.email, t.name, t.role FROM trainer_tokens k JOIN trainers t ON t.email = k.email WHERE k.token = ?', token));
     return row ? { email: row.email, name: row.name, role: row.role || 'trainer' } : null;
   }
 
-  revoke(token) {
+  async revoke(token) {
     // Signed tokens cannot be recalled individually; clearing the cookie signs the browser out.
-    if (token && !String(token).includes('.')) this.db.prepare('DELETE FROM trainer_tokens WHERE token = ?').run(token);
+    if (token && !String(token).includes('.')) (await this.db.run('DELETE FROM trainer_tokens WHERE token = ?', token));
   }
 }

@@ -12,7 +12,6 @@ import { seedIfEmpty, loadSlideDecks } from './seed/index.js';
 import { createApi } from './api.js';
 import { HttpError, sendJson } from './http.js';
 import { createStatic } from './static.js';
-import { storeFromEnv, restoreSnapshot, startSnapshots } from './persist.js';
 
 export function lanAddress() {
   const candidates = [];
@@ -52,17 +51,33 @@ export function sessionSecret(dbPath = process.env.DB_PATH || 'data/daily-quiz.s
   } catch { return null; }
 }
 
-export async function createApp({ dbPath, publicUrl, secret, store = storeFromEnv(), snapshotMs } = {}) {
-  const file = dbPath || process.env.DB_PATH || 'data/daily-quiz.sqlite';
+/**
+ * Which database to open. DATABASE_URL (Render Postgres) wins unless a SQLite file is asked for
+ * explicitly. Tests ask for ':memory:'; with TEST_DATABASE_URL set they get their own throwaway
+ * Postgres schema instead, so the same suite can run against both backends.
+ */
+function databaseFor({ dbPath, databaseUrl }) {
+  if (dbPath === ':memory:' && process.env.TEST_DATABASE_URL) {
+    return { url: process.env.TEST_DATABASE_URL, schema: `test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` };
+  }
+  if (databaseUrl) return { url: databaseUrl };
+  if (dbPath) return { file: dbPath };
+  if (process.env.DATABASE_URL) return { url: process.env.DATABASE_URL };
+  return { file: process.env.DB_PATH || 'data/daily-quiz.sqlite' };
+}
+
+export async function createApp({ dbPath, databaseUrl, publicUrl, secret } = {}) {
   const log = (m) => console.log('  ' + m);
-  if (store) await restoreSnapshot(store, file, { log });
-  const db = openDb(file);
-  const persist = store && file !== ':memory:' ? startSnapshots(db, file, store, { intervalMs: snapshotMs, log }) : null;
+  const target = databaseFor({ dbPath, databaseUrl });
+  const db = await openDb(target);
+  if (target.schema) await dropStaleTestSchemas(db);
+  log(db.dialect === 'postgres' ? `database: Postgres${target.schema ? ` (schema ${target.schema})` : ''}` : `database: SQLite ${target.file}`);
   const seeded = await seedIfEmpty(db, { log });
   const decks = await loadSlideDecks();
-  const auth = new Auth(db, { secret: secret || sessionSecret(file) });
+  const auth = new Auth(db, { secret: secret || sessionSecret(target.file) });
   const live = new Live(db, { decks });
-  const api = createApi({ db, live, auth, decks, publicUrl: publicUrl || '' });
+  await live.ready;
+  const api = await createApi({ db, live, auth, decks, publicUrl: publicUrl || '' });
   const serveStatic = createStatic();
 
   const server = http.createServer(async (req, res) => {
@@ -87,7 +102,23 @@ export async function createApp({ dbPath, publicUrl, secret, store = storeFromEn
     }
   });
 
-  return { server, db, live, auth, decks, seeded, persist, store, setPublicUrl: (u) => { api.publicUrl = u; } };
+  /** Stops timers and the server and releases the database (drops a test schema). */
+  const close = async () => {
+    live.timers.forEach((t) => { clearTimeout(t.question); clearTimeout(t.session); });
+    await new Promise((r) => server.close(() => r()));
+    if (target.schema) await db.exec(`DROP SCHEMA IF EXISTS ${target.schema} CASCADE`);
+    await db.close();
+  };
+  return { server, db, live, auth, decks, seeded, close, setPublicUrl: (u) => { api.publicUrl = u; } };
+}
+
+/** Test schemas older than half an hour are leftovers of interrupted runs. */
+async function dropStaleTestSchemas(db) {
+  const cutoff = Date.now() - 30 * 60 * 1000;
+  for (const { nspname } of await db.all("SELECT nspname FROM pg_namespace WHERE nspname LIKE 'test_%'")) {
+    const stamp = Number(nspname.split('_')[1]);
+    if (stamp && stamp < cutoff) await db.exec(`DROP SCHEMA IF EXISTS ${nspname} CASCADE`).catch(() => {});
+  }
 }
 
 // pathToFileURL handles both Windows drive paths and Linux absolute paths (a hand-built
@@ -101,17 +132,6 @@ if (isMain) {
   console.log('Ferguson Training quiz starting…');
   const app = await createApp({ publicUrl });
   if (app.seeded.seeded) console.log(`Seeded ${app.seeded.sessions} sessions with ${app.seeded.questions} questions.`);
-  if (app.persist) {
-    // The host stops the instance with SIGTERM (deploys, spin-down): get the last changes out first.
-    const shutdown = async (signal) => {
-      console.log(`${signal}: saving the database snapshot before exit…`);
-      try { await app.persist.flush(); } catch { /* logged by persist */ }
-      app.persist.stop();
-      await app.store.close().catch(() => {});
-      process.exit(0);
-    };
-    for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => shutdown(sig));
-  }
   app.server.listen(port, host, () => {
     console.log('');
     console.log(`  Interns join at:   ${publicUrl}`);

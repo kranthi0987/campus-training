@@ -13,31 +13,33 @@ import { zipStore } from './zip.js';
 
 const COMPLEXITY = new Set(['easy', 'medium', 'hard']);
 
-export function createApi({ db, live, auth, decks, publicUrl }) {
+export async function createApi({ db, live, auth, decks, publicUrl }) {
   const r = new Router();
 
-  const userOf = (req) => auth.trainerForToken(parseCookies(req)[COOKIE]);
-  const requireTrainer = (req) => {
-    const t = userOf(req);
+  const userOf = async (req) => {
+    return await auth.trainerForToken(parseCookies(req)[COOKIE]);
+  };
+  const requireTrainer = async (req) => {
+    const t = await userOf(req);
     if (!t) throw new HttpError(401, 'Sign in as a trainer');
     return t;
   };
-  const requireAdmin = (req) => {
-    const t = requireTrainer(req);
+  const requireAdmin = async (req) => {
+    const t = await requireTrainer(req);
     if (t.role !== 'admin') throw new HttpError(403, 'Only an admin can do this');
     return t;
   };
   /** Signed in and allowed to open this session: admins always, trainers only for their own. */
-  const requireSession = (req, id) => {
-    const user = requireTrainer(req);
-    const session = live.mustSession(id);
+  const requireSession = async (req, id) => {
+    const user = await requireTrainer(req);
+    const session = await live.mustSession(id);
     if (!sessionAllows(session, user)) throw new HttpError(403, 'This session is assigned to another trainer');
     return { user, session };
   };
-  const requireParticipant = (req, participantId) => {
-    const p = db.prepare('SELECT * FROM participants WHERE id = ?').get(Number(participantId));
+  const requireParticipant = async (req, participantId) => {
+    const p = (await db.get('SELECT * FROM participants WHERE id = ?', Number(participantId)));
     if (!p) throw new HttpError(404, 'Participant not found');
-    return { ...requireSession(req, p.session_id), participant: p };
+    return { ...(await requireSession(req, p.session_id)), participant: p };
   };
   const participantToken = (req, url) => req.headers['x-participant-token'] || url.searchParams.get('token') || '';
   const sessionId = (params) => {
@@ -46,108 +48,105 @@ export function createApi({ db, live, auth, decks, publicUrl }) {
     return id;
   };
   /** Keeps only emails that belong to existing accounts. */
-  const cleanEmails = (list) => {
+  const cleanEmails = async (list) => {
     if (!Array.isArray(list)) return [];
     const out = [];
-    for (const e of list.map(normalizeEmail)) if (e && !out.includes(e) && auth.get(e)) out.push(e);
+    for (const e of list.map(normalizeEmail)) if (e && !out.includes(e) && await auth.get(e)) out.push(e);
     return out;
   };
   const sessionSummary = (row) => ({ ...rowToSession(row), questionCount: row.question_count, participantCount: row.participant_count, hasSlides: !!(row.slides_key && decks.has(row.slides_key)) });
-  const allSessions = () => db.prepare(
-    `SELECT s.*, (SELECT COUNT(*) FROM questions q WHERE q.session_id = s.id) AS question_count,
+  const allSessions = async () => (await db.all(`SELECT s.*, (SELECT COUNT(*) FROM questions q WHERE q.session_id = s.id) AS question_count,
             (SELECT COUNT(*) FROM participants p WHERE p.session_id = s.id) AS participant_count
-       FROM sessions s ORDER BY s.date, s.day_no, s.id`,
-  ).all().map(sessionSummary);
+       FROM sessions s ORDER BY s.date, s.day_no, s.id`,)).map(sessionSummary);
 
   // ---- info ---------------------------------------------------------------
-  r.get('/api/info', (req, res) => sendJson(res, 200, { publicUrl, setupNeeded: auth.count() === 0 }));
+  r.get('/api/info', async (req, res) => sendJson(res, 200, { publicUrl, setupNeeded: (await auth.count()) === 0 }));
 
   // ---- trainer auth -------------------------------------------------------
   r.post('/api/trainer/login', async (req, res) => {
     const body = await readBody(req);
-    const trainer = auth.login(body.email, body.password, String(body.name || '').trim().slice(0, 60));
-    if (!trainer) throw new HttpError(401, auth.count() === 0 ? 'Email or password is wrong' : 'Email or password is wrong. New here? Ask the admin to add you.');
-    const token = auth.issueToken(trainer.email);
+    const trainer = await auth.login(body.email, body.password, String(body.name || '').trim().slice(0, 60));
+    if (!trainer) throw new HttpError(401, await auth.count() === 0 ? 'Email or password is wrong' : 'Email or password is wrong. New here? Ask the admin to add you.');
+    const token = await auth.issueToken(trainer.email);
     res.setHeader('Set-Cookie', `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}`);
     sendJson(res, 200, { trainer: { email: trainer.email, name: trainer.name, role: trainer.role }, usingDefault: trainer.usingDefault });
   });
 
-  r.post('/api/trainer/logout', (req, res) => {
-    auth.revoke(parseCookies(req)[COOKIE]);
+  r.post('/api/trainer/logout', async (req, res) => {
+    await auth.revoke(parseCookies(req)[COOKIE]);
     res.setHeader('Set-Cookie', `${COOKIE}=; Path=/; HttpOnly; Max-Age=0`);
     sendJson(res, 200, { ok: true });
   });
 
-  r.get('/api/trainer/me', (req, res) => sendJson(res, 200, { trainer: requireTrainer(req) }));
+  r.get('/api/trainer/me', async (req, res) => sendJson(res, 200, { trainer: await requireTrainer(req) }));
 
   r.post('/api/trainer/password', async (req, res) => {
-    const t = requireTrainer(req);
+    const t = await requireTrainer(req);
     const body = await readBody(req);
-    if (!auth.changePassword(t.email, body.current, body.next)) throw new HttpError(400, 'Current password is wrong or the new one is shorter than 8 characters');
+    if (!await auth.changePassword(t.email, body.current, body.next)) throw new HttpError(400, 'Current password is wrong or the new one is shorter than 8 characters');
     // A new password invalidates every existing token; keep this browser signed in with a fresh one.
-    res.setHeader('Set-Cookie', `${COOKIE}=${auth.issueToken(t.email)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}`);
+    res.setHeader('Set-Cookie', `${COOKIE}=${await auth.issueToken(t.email)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}`);
     sendJson(res, 200, { ok: true });
   });
 
   // ---- trainer accounts (admin) -------------------------------------------
-  const setSessionsFor = (email, sessionIds) => {
+  const setSessionsFor = async (email, sessionIds) => {
     if (!Array.isArray(sessionIds)) return;
     const wanted = new Set(sessionIds.map(Number).filter(Number.isInteger));
-    const upd = db.prepare('UPDATE sessions SET trainer_emails = ? WHERE id = ?');
-    for (const row of db.prepare('SELECT id, trainer_emails FROM sessions').all()) {
+    for (const row of await db.all('SELECT id, trainer_emails FROM sessions')) {
       const cur = JSON.parse(row.trainer_emails || '[]');
       const next = wanted.has(row.id) ? [...new Set([...cur, email])] : cur.filter((e) => e !== email);
-      if (next.length !== cur.length) upd.run(JSON.stringify(next), row.id);
+      if (next.length !== cur.length) await db.run('UPDATE sessions SET trainer_emails = ? WHERE id = ?', JSON.stringify(next), row.id);
     }
   };
-  const trainerList = () => {
-    const sessions = db.prepare('SELECT * FROM sessions ORDER BY date, day_no, id').all().map(rowToSession);
-    return auth.list().map((t) => ({
+  const trainerList = async () => {
+    const sessions = (await db.all('SELECT * FROM sessions ORDER BY date, day_no, id')).map(rowToSession);
+    return (await auth.list()).map((t) => ({
       ...t,
       sessionIds: sessions.filter((s) => s.trainerEmails.includes(t.email)).map((s) => s.id),
       matchedSessionIds: t.role === 'admin' ? [] : sessions.filter((s) => !s.trainerEmails.includes(t.email) && sessionAllows(s, t)).map((s) => s.id),
     }));
   };
 
-  r.get('/api/trainers', (req, res) => { requireAdmin(req); sendJson(res, 200, { trainers: trainerList() }); });
+  r.get('/api/trainers', async (req, res) => { await requireAdmin(req); sendJson(res, 200, { trainers: await trainerList() }); });
 
   r.post('/api/trainers', async (req, res) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     const b = await readBody(req);
-    const created = auth.create({ email: b.email, name: b.name, role: b.role || 'trainer', password: b.password });
-    setSessionsFor(created.email, b.sessionIds);
-    sendJson(res, 201, { trainer: trainerList().find((t) => t.email === created.email), usingDefault: created.usingDefault });
+    const created = await auth.create({ email: b.email, name: b.name, role: b.role || 'trainer', password: b.password });
+    await setSessionsFor(created.email, b.sessionIds);
+    sendJson(res, 201, { trainer: (await trainerList()).find((t) => t.email === created.email), usingDefault: created.usingDefault });
   });
 
   r.put('/api/trainers/:email', async (req, res, params) => {
-    const me = requireAdmin(req);
+    const me = await requireAdmin(req);
     const b = await readBody(req);
     const email = normalizeEmail(params.email);
     if (email === me.email && b.role !== undefined && b.role !== 'admin') throw new HttpError(400, 'You cannot remove your own admin role');
-    const updated = auth.update(email, { name: b.name, role: b.role, password: b.password });
-    setSessionsFor(updated.email, b.sessionIds);
-    sendJson(res, 200, { trainer: trainerList().find((t) => t.email === updated.email) });
+    const updated = await auth.update(email, { name: b.name, role: b.role, password: b.password });
+    await setSessionsFor(updated.email, b.sessionIds);
+    sendJson(res, 200, { trainer: (await trainerList()).find((t) => t.email === updated.email) });
   });
 
-  r.delete('/api/trainers/:email', (req, res, params) => {
-    const me = requireAdmin(req);
+  r.delete('/api/trainers/:email', async (req, res, params) => {
+    const me = await requireAdmin(req);
     const email = normalizeEmail(params.email);
     if (email === me.email) throw new HttpError(400, 'You cannot remove your own account');
-    const out = auth.remove(email);
-    setSessionsFor(email, []);
+    const out = await auth.remove(email);
+    await setSessionsFor(email, []);
     sendJson(res, 200, out);
   });
 
   // ---- sessions -----------------------------------------------------------
-  r.get('/api/sessions', (req, res) => {
-    const user = requireTrainer(req);
-    sendJson(res, 200, { sessions: allSessions().filter((s) => sessionAllows(s, user)) });
+  r.get('/api/sessions', async (req, res) => {
+    const user = await requireTrainer(req);
+    sendJson(res, 200, { sessions: (await allSessions()).filter((s) => sessionAllows(s, user)) });
   });
 
   // ---- roster: everyone signed in may read it, only admins change it ------
-  r.get('/api/roster', (req, res) => { requireTrainer(req); sendJson(res, 200, { roster: live.roster() }); });
+  r.get('/api/roster', async (req, res) => { await requireTrainer(req); sendJson(res, 200, { roster: await live.roster() }); });
   r.post('/api/roster', async (req, res) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     const b = await readBody(req);
     let entries = Array.isArray(b.entries) ? b.entries : [];
     if (typeof b.text === 'string') {
@@ -160,36 +159,34 @@ export function createApi({ db, live, auth, decks, publicUrl }) {
       }
     }
     if (!entries.length) throw new HttpError(400, 'No participants found. Use one "Name, email" per line.');
-    sendJson(res, 200, { ...live.addToRoster(entries), roster: live.roster() });
+    sendJson(res, 200, { ...(await live.addToRoster(entries)), roster: await live.roster() });
   });
-  r.delete('/api/roster', (req, res, params, url) => {
-    requireAdmin(req);
-    sendJson(res, 200, { ...live.removeFromRoster(url.searchParams.get('email')), roster: live.roster() });
+  r.delete('/api/roster', async (req, res, params, url) => {
+    await requireAdmin(req);
+    sendJson(res, 200, { ...(await live.removeFromRoster(url.searchParams.get('email'))), roster: await live.roster() });
   });
 
   r.post('/api/sessions', async (req, res) => {
-    const user = requireTrainer(req);
+    const user = await requireTrainer(req);
     const b = await readBody(req);
     const title = String(b.title || '').trim();
     if (!title) throw new HttpError(400, 'Title is required');
     const trainers = Array.isArray(b.trainers) ? b.trainers.map((t) => String(t).trim()).filter(Boolean) : [];
     // A trainer's own session is assigned to them; an admin picks the accounts.
-    const trainerEmails = user.role === 'admin' ? cleanEmails(b.trainerEmails) : [user.email];
-    const { lastInsertRowid } = db.prepare(
-      'INSERT INTO sessions (day_no, date, module, title, subtopics, trainers, join_code, trainer_emails) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    ).run(b.dayNo ?? null, String(b.date || '').slice(0, 10) || null, String(b.module || '').trim() || null, title, String(b.subtopics || '').trim(), JSON.stringify(trainers), uniqueJoinCode(db), JSON.stringify(trainerEmails));
-    sendJson(res, 201, { session: live.session(Number(lastInsertRowid)) });
+    const trainerEmails = user.role === 'admin' ? await cleanEmails(b.trainerEmails) : [user.email];
+    const { lastInsertRowid } = (await db.run('INSERT INTO sessions (day_no, date, module, title, subtopics, trainers, join_code, trainer_emails) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', b.dayNo ?? null, String(b.date || '').slice(0, 10) || null, String(b.module || '').trim() || null, title, String(b.subtopics || '').trim(), JSON.stringify(trainers), await uniqueJoinCode(db), JSON.stringify(trainerEmails)));
+    sendJson(res, 201, { session: await live.session(Number(lastInsertRowid)) });
   });
 
-  r.get('/api/sessions/:id', (req, res, params) => {
+  r.get('/api/sessions/:id', async (req, res, params) => {
     const id = sessionId(params);
-    const { session: s } = requireSession(req, id);
-    sendJson(res, 200, { session: { ...s, hasSlides: !!(s.slidesKey && decks.has(s.slidesKey)) }, questions: live.listQuestions(id) });
+    const { session: s } = await requireSession(req, id);
+    sendJson(res, 200, { session: { ...s, hasSlides: !!(s.slidesKey && decks.has(s.slidesKey)) }, questions: await live.listQuestions(id) });
   });
 
   r.put('/api/sessions/:id', async (req, res, params) => {
     const id = sessionId(params);
-    const { user, session: s } = requireSession(req, id);
+    const { user, session: s } = await requireSession(req, id);
     const b = await readBody(req);
     const num = (v, lo, hi, cur) => {
       if (v === undefined) return cur;
@@ -198,7 +195,7 @@ export function createApi({ db, live, auth, decks, publicUrl }) {
       return n;
     };
     const trainers = b.trainers === undefined ? s.trainers : (Array.isArray(b.trainers) ? b.trainers.map((t) => String(t).trim()).filter(Boolean) : s.trainers);
-    const trainerEmails = user.role === 'admin' && b.trainerEmails !== undefined ? cleanEmails(b.trainerEmails) : s.trainerEmails;
+    const trainerEmails = user.role === 'admin' && b.trainerEmails !== undefined ? await cleanEmails(b.trainerEmails) : s.trainerEmails;
     const reveal = b.reveal === undefined ? s.reveal : String(b.reveal);
     if (!['end', 'each'].includes(reveal)) throw new HttpError(400, 'reveal must be "end" or "each"');
     // Quiz checkpoints: {"<slide index>": [question ids to ask after that slide]}; null returns to the deck's own.
@@ -207,8 +204,8 @@ export function createApi({ db, live, auth, decks, publicUrl }) {
       if (b.checkpoints === null) checkpoints = null;
       else {
         if (typeof b.checkpoints !== 'object' || Array.isArray(b.checkpoints)) throw new HttpError(400, 'checkpoints must be an object of slide index to question ids, or null');
-        const slides = flattenDeck(live.deckForSession({ ...s, checkpoints: null })).length;
-        const list = live.listQuestions(id);
+        const slides = flattenDeck(await live.deckForSession({ ...s, checkpoints: null })).length;
+        const list = await live.listQuestions(id);
         const numberOf = new Map(list.map((q, i) => [q.id, i + 1]));
         const used = new Map();
         checkpoints = {};
@@ -228,24 +225,20 @@ export function createApi({ db, live, auth, decks, publicUrl }) {
         }
       }
     }
-    db.prepare(
-      `UPDATE sessions SET title = ?, date = ?, module = ?, subtopics = ?, trainers = ?, trainer_emails = ?, time_limit_min = ?, easy_s = ?, medium_s = ?, hard_s = ?, reveal = ?, checkpoints = ? WHERE id = ?`,
-    ).run(
-      String(b.title ?? s.title).trim() || s.title, b.date === undefined ? s.date : String(b.date).slice(0, 10), b.module === undefined ? s.module : String(b.module).trim(),
+    (await db.run(`UPDATE sessions SET title = ?, date = ?, module = ?, subtopics = ?, trainers = ?, trainer_emails = ?, time_limit_min = ?, easy_s = ?, medium_s = ?, hard_s = ?, reveal = ?, checkpoints = ? WHERE id = ?`, String(b.title ?? s.title).trim() || s.title, b.date === undefined ? s.date : String(b.date).slice(0, 10), b.module === undefined ? s.module : String(b.module).trim(),
       b.subtopics === undefined ? s.subtopics : String(b.subtopics).trim(), JSON.stringify(trainers), JSON.stringify(trainerEmails),
       num(b.timeLimitMin, 1, 600, s.timeLimitMin), num(b.easyS, 5, 600, s.easyS), num(b.mediumS, 5, 600, s.mediumS), num(b.hardS, 5, 600, s.hardS), reveal,
-      checkpoints === null ? null : JSON.stringify(checkpoints), id,
-    );
-    live.broadcast(id);
-    sendJson(res, 200, { session: live.session(id) });
+      checkpoints === null ? null : JSON.stringify(checkpoints), id,));
+    await live.broadcast(id);
+    sendJson(res, 200, { session: await live.session(id) });
   });
 
-  r.post('/api/sessions/:id/code', (req, res, params) => {
+  r.post('/api/sessions/:id/code', async (req, res, params) => {
     const id = sessionId(params);
-    requireSession(req, id);
-    db.prepare('UPDATE sessions SET join_code = ? WHERE id = ?').run(uniqueJoinCode(db), id);
-    live.broadcast(id);
-    sendJson(res, 200, { session: live.session(id) });
+    await requireSession(req, id);
+    (await db.run('UPDATE sessions SET join_code = ? WHERE id = ?', await uniqueJoinCode(db), id));
+    await live.broadcast(id);
+    sendJson(res, 200, { session: await live.session(id) });
   });
 
   // ---- questions ----------------------------------------------------------
@@ -262,66 +255,66 @@ export function createApi({ db, live, auth, decks, publicUrl }) {
     if (seconds !== null && (!Number.isInteger(seconds) || seconds < 5 || seconds > 600)) throw new HttpError(400, 'Seconds must be 5–600');
     return { text, options, answer, complexity, seconds, explanation: String(b.explanation || '').trim().slice(0, 500), code: String(b.code || '').replace(/\s+$/, '').slice(0, 2000) || null };
   };
-  const nextPosition = (id) => (db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS p FROM questions WHERE session_id = ?').get(id).p);
+  const nextPosition = async (id) => ((await db.get('SELECT COALESCE(MAX(position), -1) + 1 AS p FROM questions WHERE session_id = ?', id)).p);
 
   r.post('/api/sessions/:id/questions', async (req, res, params) => {
     const id = sessionId(params);
-    requireSession(req, id);
+    await requireSession(req, id);
     const q = cleanQuestion(await readBody(req));
-    insertQuestions(db, id, [q], nextPosition(id));
-    live.broadcast(id);
-    sendJson(res, 201, { questions: live.listQuestions(id) });
+    await insertQuestions(db, id, [q], await nextPosition(id));
+    await live.broadcast(id);
+    sendJson(res, 201, { questions: await live.listQuestions(id) });
   });
 
   r.post('/api/sessions/:id/questions/bulk', async (req, res, params) => {
     const id = sessionId(params);
-    requireSession(req, id);
+    await requireSession(req, id);
     const { questions, errors } = parseBulk((await readBody(req)).text);
     if (errors.length) return sendJson(res, 400, { error: 'Some blocks could not be read', errors });
-    insertQuestions(db, id, questions, nextPosition(id));
-    live.broadcast(id);
-    sendJson(res, 201, { added: questions.length, questions: live.listQuestions(id) });
+    await insertQuestions(db, id, questions, await nextPosition(id));
+    await live.broadcast(id);
+    sendJson(res, 201, { added: questions.length, questions: await live.listQuestions(id) });
   });
 
   r.post('/api/sessions/:id/questions/reorder', async (req, res, params) => {
     const id = sessionId(params);
-    requireSession(req, id);
+    await requireSession(req, id);
     const ids = (await readBody(req)).ids;
     if (!Array.isArray(ids)) throw new HttpError(400, 'ids must be an array');
-    const stmt = db.prepare('UPDATE questions SET position = ? WHERE id = ? AND session_id = ?');
-    ids.forEach((qid, i) => stmt.run(i, Number(qid), id));
-    sendJson(res, 200, { questions: live.listQuestions(id) });
+    await db.transaction(async (tx) => {
+      for (const [i, qid] of ids.entries()) await tx.run('UPDATE questions SET position = ? WHERE id = ? AND session_id = ?', i, Number(qid), id);
+    });
+    sendJson(res, 200, { questions: await live.listQuestions(id) });
   });
 
   r.put('/api/questions/:id', async (req, res, params) => {
     const qid = Number(params.id);
-    const row = db.prepare('SELECT * FROM questions WHERE id = ?').get(qid);
+    const row = (await db.get('SELECT * FROM questions WHERE id = ?', qid));
     if (!row) throw new HttpError(404, 'Question not found');
-    requireSession(req, row.session_id);
+    await requireSession(req, row.session_id);
     const q = cleanQuestion(await readBody(req));
-    db.prepare('UPDATE questions SET text = ?, options = ?, answer = ?, complexity = ?, seconds = ?, explanation = ?, code = ? WHERE id = ?')
-      .run(q.text, JSON.stringify(q.options), q.answer, q.complexity, q.seconds, q.explanation, q.code, qid);
-    live.broadcast(row.session_id);
-    sendJson(res, 200, { question: rowToQuestion(db.prepare('SELECT * FROM questions WHERE id = ?').get(qid)) });
+    (await db.run('UPDATE questions SET text = ?, options = ?, answer = ?, complexity = ?, seconds = ?, explanation = ?, code = ? WHERE id = ?', q.text, JSON.stringify(q.options), q.answer, q.complexity, q.seconds, q.explanation, q.code, qid));
+    await live.broadcast(row.session_id);
+    sendJson(res, 200, { question: rowToQuestion((await db.get('SELECT * FROM questions WHERE id = ?', qid))) });
   });
 
-  r.delete('/api/questions/:id', (req, res, params) => {
+  r.delete('/api/questions/:id', async (req, res, params) => {
     const qid = Number(params.id);
-    const row = db.prepare('SELECT * FROM questions WHERE id = ?').get(qid);
+    const row = (await db.get('SELECT * FROM questions WHERE id = ?', qid));
     if (!row) throw new HttpError(404, 'Question not found');
-    const { session: s } = requireSession(req, row.session_id);
+    const { session: s } = await requireSession(req, row.session_id);
     if (s.status === 'live') throw new HttpError(409, 'Cannot delete questions while the quiz is running');
-    db.prepare('DELETE FROM questions WHERE id = ?').run(qid);
-    db.prepare('DELETE FROM answers WHERE question_id = ?').run(qid);
-    sendJson(res, 200, { questions: live.listQuestions(row.session_id) });
+    (await db.run('DELETE FROM questions WHERE id = ?', qid));
+    (await db.run('DELETE FROM answers WHERE question_id = ?', qid));
+    sendJson(res, 200, { questions: await live.listQuestions(row.session_id) });
   });
 
   // ---- lifecycle ----------------------------------------------------------
   const action = (name, fn) => r.post(`/api/sessions/:id/${name}`, async (req, res, params) => {
     const id = sessionId(params);
-    requireSession(req, id);
+    await requireSession(req, id);
     const body = await readBody(req);
-    sendJson(res, 200, { state: fn(id, body) });
+    sendJson(res, 200, { state: await fn(id, body) });
   });
   action('lobby', (id) => live.openLobby(id));
   action('start', (id) => live.startQuiz(id));
@@ -333,81 +326,83 @@ export function createApi({ db, live, auth, decks, publicUrl }) {
   action('advance', (id, b) => live.advanceSlide(id, Number(b.dir) < 0 ? -1 : 1));
 
   // ---- scorecards + housekeeping (admin) ----------------------------------
-  r.get('/api/dashboard', (req, res) => { requireAdmin(req); sendJson(res, 200, live.dashboard()); });
-  r.delete('/api/participants/:id', (req, res, params) => { requireParticipant(req, params.id); sendJson(res, 200, live.removeParticipant(params.id)); });
-  r.delete('/api/interns', (req, res, params, url) => { requireAdmin(req); sendJson(res, 200, live.removeIntern(url.searchParams.get('email'))); });
+  r.get('/api/dashboard', async (req, res) => { await requireAdmin(req); sendJson(res, 200, await live.dashboard()); });
+  r.delete('/api/participants/:id', async (req, res, params) => { await requireParticipant(req, params.id); sendJson(res, 200, await live.removeParticipant(params.id)); });
+  r.delete('/api/interns', async (req, res, params, url) => { await requireAdmin(req); sendJson(res, 200, await live.removeIntern(url.searchParams.get('email'))); });
   r.post('/api/admin/clear-data', async (req, res) => {
-    requireAdmin(req);
+    await requireAdmin(req);
     const b = await readBody(req);
     if (b.confirm !== 'CLEAR') throw new HttpError(400, 'Send { "confirm": "CLEAR" } to wipe all participant data');
-    sendJson(res, 200, live.clearAllData());
+    sendJson(res, 200, await live.clearAllData());
   });
 
   // ---- certificates (admin, or the session's trainer) ---------------------
   const withFile = (c) => ({ ...c, filename: certificateFilename(c) });
-  const sessionCertificates = (s) => {
+  const sessionCertificates = async (s) => {
     if (s.status !== 'ended') throw new HttpError(409, 'Certificates are issued when the session has finished');
-    return live.scoreboard(s.id).map((row) => withFile(live.certificate(row.id)));
+    const out = [];
+    for (const row of await live.scoreboard(s.id)) out.push(withFile(await live.certificate(row.id)));
+    return out;
   };
   const slug = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
 
-  r.get('/api/participants/:id/certificate', (req, res, params) => {
-    requireParticipant(req, params.id);
-    sendJson(res, 200, { certificate: withFile(live.certificate(params.id)) });
+  r.get('/api/participants/:id/certificate', async (req, res, params) => {
+    await requireParticipant(req, params.id);
+    sendJson(res, 200, { certificate: withFile(await live.certificate(params.id)) });
   });
-  r.get('/api/participants/:id/certificate.svg', (req, res, params) => {
-    requireParticipant(req, params.id);
-    const c = live.certificate(params.id);
+  r.get('/api/participants/:id/certificate.svg', async (req, res, params) => {
+    await requireParticipant(req, params.id);
+    const c = await live.certificate(params.id);
     res.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Content-Disposition': `attachment; filename="${certificateFilename(c)}"` });
     res.end(certificateSvg(c));
   });
-  r.get('/api/sessions/:id/certificates', (req, res, params) => {
-    const { session: s } = requireSession(req, sessionId(params));
-    const list = sessionCertificates(s).map((c) => ({
+  r.get('/api/sessions/:id/certificates', async (req, res, params) => {
+    const { session: s } = await requireSession(req, sessionId(params));
+    const list = (await sessionCertificates(s)).map((c) => ({
       participantId: c.participantId, name: c.name, email: c.email, score: c.score, correct: c.correct,
       questionCount: c.questionCount, rank: c.rank, participants: c.participants, filename: c.filename,
     }));
     sendJson(res, 200, { session: { id: s.id, title: s.title, date: s.date, module: s.module, status: s.status }, certificates: list });
   });
-  r.get('/api/sessions/:id/certificates.zip', (req, res, params) => {
-    const { session: s } = requireSession(req, sessionId(params));
-    const files = sessionCertificates(s).map((c) => ({ name: c.filename, data: certificateSvg(c) }));
+  r.get('/api/sessions/:id/certificates.zip', async (req, res, params) => {
+    const { session: s } = await requireSession(req, sessionId(params));
+    const files = (await sessionCertificates(s)).map((c) => ({ name: c.filename, data: certificateSvg(c) }));
     const zip = zipStore(files);
     res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Length': zip.length, 'Content-Disposition': `attachment; filename="certificates-${slug(s.title) || s.id}.zip"` });
     res.end(zip);
   });
 
-  r.get('/api/sessions/:id/state', (req, res, params) => {
+  r.get('/api/sessions/:id/state', async (req, res, params) => {
     const id = sessionId(params);
-    requireSession(req, id);
-    sendJson(res, 200, { state: live.snapshot(id, { host: true }) });
+    await requireSession(req, id);
+    sendJson(res, 200, { state: await live.snapshot(id, { host: true }) });
   });
 
-  r.get('/api/sessions/:id/events', (req, res, params) => {
+  r.get('/api/sessions/:id/events', async (req, res, params) => {
     const id = sessionId(params);
-    requireSession(req, id);
+    await requireSession(req, id);
     const sse = openSse(req, res);
-    sse.send('state', live.snapshot(id, { host: true }));
+    sse.send('state', await live.snapshot(id, { host: true }));
     const off = live.subscribe(id, (snap) => sse.send('state', snap), { host: true });
     req.on('close', () => { off(); sse.close(); });
   });
 
-  r.get('/api/sessions/:id/deck', (req, res, params) => {
-    const { session: s } = requireSession(req, sessionId(params));
-    const deck = live.deckForSession(s);
+  r.get('/api/sessions/:id/deck', async (req, res, params) => {
+    const { session: s } = await requireSession(req, sessionId(params));
+    const deck = await live.deckForSession(s);
     sendJson(res, 200, { deck: { key: deck.key, title: deck.title, synthetic: !!deck.synthetic, sections: deck.sections, slides: flattenDeck(deck) } });
   });
 
-  r.get('/api/sessions/:id/results.csv', (req, res, params) => {
+  r.get('/api/sessions/:id/results.csv', async (req, res, params) => {
     const id = sessionId(params);
-    requireSession(req, id);
-    const { filename, csv } = live.resultsCsv(id);
+    await requireSession(req, id);
+    const { filename, csv } = await live.resultsCsv(id);
     res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${filename}"` });
     res.end(csv);
   });
 
   r.get('/api/sessions/:id/qr.svg', async (req, res, params) => {
-    const { session: s } = requireSession(req, sessionId(params));
+    const { session: s } = await requireSession(req, sessionId(params));
     const url = `${publicUrl}/join?code=${s.joinCode}`;
     const svg = await QRCode.toString(url, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#0f1626', light: '#fffdf9' } });
     res.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -415,57 +410,57 @@ export function createApi({ db, live, auth, decks, publicUrl }) {
   });
 
   // ---- interns ------------------------------------------------------------
-  r.get('/api/session-by-code', (req, res, params, url) => {
-    const s = live.sessionByCode(url.searchParams.get('code'));
+  r.get('/api/session-by-code', async (req, res, params, url) => {
+    const s = await live.sessionByCode(url.searchParams.get('code'));
     if (!s) throw new HttpError(404, 'No session with that code');
     sendJson(res, 200, { session: { id: s.id, title: s.title, module: s.module, date: s.date, status: s.status, trainers: s.trainers } });
   });
 
   // Lets the join page greet a known intern by name before they tap Join.
-  r.get('/api/roster/lookup', (req, res, params, url) => {
-    const entry = live.rosterEntry(url.searchParams.get('email'));
+  r.get('/api/roster/lookup', async (req, res, params, url) => {
+    const entry = await live.rosterEntry(url.searchParams.get('email'));
     if (!entry) throw new HttpError(404, 'This email is not on the participant list');
     sendJson(res, 200, { name: entry.name });
   });
 
   r.post('/api/join', async (req, res) => {
     const b = await readBody(req);
-    sendJson(res, 200, live.join(b.code, b.email));
+    sendJson(res, 200, await live.join(b.code, b.email));
   });
 
-  r.get('/api/play/state', (req, res, params, url) => {
-    const p = live.mustParticipant(participantToken(req, url));
-    sendJson(res, 200, { state: live.snapshot(p.sessionId, { participantId: p.id }) });
+  r.get('/api/play/state', async (req, res, params, url) => {
+    const p = await live.mustParticipant(participantToken(req, url));
+    sendJson(res, 200, { state: await live.snapshot(p.sessionId, { participantId: p.id }) });
   });
 
-  r.get('/api/play/events', (req, res, params, url) => {
-    const p = live.mustParticipant(participantToken(req, url));
+  r.get('/api/play/events', async (req, res, params, url) => {
+    const p = await live.mustParticipant(participantToken(req, url));
     const sse = openSse(req, res);
-    sse.send('state', live.snapshot(p.sessionId, { participantId: p.id }));
+    sse.send('state', await live.snapshot(p.sessionId, { participantId: p.id }));
     const off = live.subscribe(p.sessionId, (snap) => sse.send('state', snap), { participantId: p.id });
     req.on('close', () => { off(); sse.close(); });
   });
 
   r.post('/api/play/answer', async (req, res, params, url) => {
     const b = await readBody(req);
-    sendJson(res, 200, live.answer(participantToken(req, url), b.questionId, b.choice));
+    sendJson(res, 200, await live.answer(participantToken(req, url), b.questionId, b.choice));
   });
 
-  r.get('/api/play/certificate', (req, res, params, url) => {
-    const p = live.mustParticipant(participantToken(req, url));
-    sendJson(res, 200, { certificate: withFile(live.certificate(p.id)) });
+  r.get('/api/play/certificate', async (req, res, params, url) => {
+    const p = await live.mustParticipant(participantToken(req, url));
+    sendJson(res, 200, { certificate: withFile(await live.certificate(p.id)) });
   });
 
-  r.get('/api/play/certificate.svg', (req, res, params, url) => {
-    const p = live.mustParticipant(participantToken(req, url));
-    const c = live.certificate(p.id);
+  r.get('/api/play/certificate.svg', async (req, res, params, url) => {
+    const p = await live.mustParticipant(participantToken(req, url));
+    const c = await live.certificate(p.id);
     res.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Content-Disposition': `attachment; filename="${certificateFilename(c)}"` });
     res.end(certificateSvg(c));
   });
 
   r.post('/api/play/rating', async (req, res, params, url) => {
     const b = await readBody(req);
-    sendJson(res, 200, live.rate(participantToken(req, url), b.ratings, b.comment));
+    sendJson(res, 200, await live.rate(participantToken(req, url), b.ratings, b.comment));
   });
 
   return r;

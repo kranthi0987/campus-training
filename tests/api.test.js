@@ -70,10 +70,10 @@ test('full run: edit questions, open lobby, join, answer, scoreboard, rating, ex
 
   const detail = await call(`/api/sessions/${s.id}`);
   const q1 = detail.data.questions[0];
-  const edited = await call(`/api/questions/${q1.id}`, { method: 'PUT', body: { ...q1, text: 'Edited: ' + q1.text, seconds: 5 } });
+  const edited = await call(`/api/questions/${q1.id}`, { method: 'PUT', body: { ...q1, text: 'Edited: ' + q1.text, seconds: 30 } });
   assert.equal(edited.status, 200);
   assert.match(edited.data.question.text, /^Edited: /);
-  assert.equal((await call(`/api/sessions/${s.id}`, { method: 'PUT', body: { timeLimitMin: 2, easyS: 5, mediumS: 5, hardS: 5 } })).status, 200);
+  assert.equal((await call(`/api/sessions/${s.id}`, { method: 'PUT', body: { timeLimitMin: 2, easyS: 30, mediumS: 30, hardS: 30 } })).status, 200);
 
   // lobby + QR + join
   assert.equal((await call(`/api/sessions/${s.id}/lobby`, { method: 'POST' })).status, 200);
