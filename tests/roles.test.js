@@ -151,5 +151,6 @@ test('account guards: no self-removal, keep one admin, removal revokes access', 
   assert.equal((await call('/api/trainer/me', { as: 'sub' })).status, 401);
   assert.equal((await call('/api/trainers/sub@example.com', { method: 'DELETE' })).status, 404);
   const s = (await call('/api/sessions')).data.sessions.find((x) => x.key === 'day11-spring-boot');
-  assert.deepEqual(s.trainerEmails, [], 'removed from the sessions it was assigned to');
+  assert.ok(!s.trainerEmails.includes('sub@example.com'), 'removed from the sessions it was assigned to');
+  assert.ok(s.trainerEmails.length >= 1, 'the seeded assignments from the schedule stay');
 });

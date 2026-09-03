@@ -187,20 +187,20 @@ export default {
         {
           title: "The Basics of JavaScript",
           bullets: [
-            "What it is, why it exists, where it runs."
+            "What it is, why it exists, where it runs"
           ],
           note: ""
         },
         {
           title: "What’s JavaScript???",
           bullets: [
-            "JavaScript is a scripting language most often used for client-side web development.",
-            "JavaScript is an implementation of the ECMAScript Standard.",
-            "EMCAScript defines the syntax/characteristics of the language.",
-            "Basic set of commonly used objects such as Numbers, Date, Regular Expression, etc.",
+            "JavaScript is a scripting language most often used for client-side web development",
+            "JavaScript is an implementation of the ECMAScript Standard",
+            "EMCAScript defines the syntax/characteristics of the language",
+            "Basic set of commonly used objects such as Numbers, Date, Regular Expression, etc",
             "The JavaScript-supported browsers typically support additional objects",
-            "e.g. Windows, Frame, Form, DOM, etc.",
-            "Different types of versions are available.",
+            "e.g. Windows, Frame, Form, DOM, etc",
+            "Different types of versions are available",
             "e.g. JScript is the Microsoft version of JavaScript, ActionScript for Adobe, etc,"
           ],
           note: ""
@@ -248,8 +248,8 @@ export default {
             "alert()",
             "console.log()",
             "window.print()",
-            "Prefer DOM updates for user-facing output.",
-            "document.write() is mainly useful for demos/testing and should not be used for normal application UI."
+            "Prefer DOM updates for user-facing output",
+            "document.write() is mainly useful for demos/testing and should not be used for normal application UI"
           ],
           note: ""
         }
@@ -274,7 +274,7 @@ export default {
             "var – function-scoped (legacy)",
             "let & const- block-scoped",
             "Data types",
-            "Primitive values: string, number, bigint, boolean, undefined, null, symbol.",
+            "Primitive values: string, number, bigint, boolean, undefined, null, symbol",
             "typeof",
             "Operators",
             "Arithmetic: + - * / % **",
@@ -285,7 +285,7 @@ export default {
         {
           title: "Conditions",
           bullets: [
-            "if / else for branching.",
+            "if / else for branching",
             "switch??",
             "ternary",
             "Loops & Iterations",
@@ -316,11 +316,11 @@ export default {
         {
           title: "Exercise 1 — Employee Search",
           bullets: [
-            "Given an array of employee objects, search by name.",
-            "Filter only active employees.",
-            "Return names sorted alphabetically.",
-            "Render the result into the DOM.",
-            "Bonus: show a 'No results' message."
+            "Given an array of employee objects, search by name",
+            "Filter only active employees",
+            "Return names sorted alphabetically",
+            "Render the result into the DOM",
+            "Bonus: show a 'No results' message"
           ],
           note: ""
         },
@@ -331,11 +331,12 @@ export default {
             "Employee Name",
             "Salary",
             "Performance Score",
-            "Calculate a 10% bonus for each employee.",
+            "Calculate a 10% bonus for each employee",
             "Calculate the total salary:",
             "Total Salary = Salary + Bonus",
             "Determine the employee's performance category based on their performance score: 80-100 -> Excellent 60-79 -> Good 40-59 -> Average 0-49 -> Needs Improvement",
-            "Process all employees using a loop."
+            "Process all employees using a loop",
+            "Display the final results directly on the webpage, not only in the browser console"
           ],
           note: ""
         },
@@ -350,11 +351,11 @@ export default {
           title: "Modules",
           bullets: [
             "DOM Manipulation",
-            "class EmployquerySelector() uses CSS selectors.",
-            "textContent is appropriate when inserting text.",
-            "classList is useful for UI state changes.",
-            "Modules make dependencies explicit.",
-            "Keep modules focused & expose only what other modules need."
+            "class EmployquerySelector() uses CSS selectors",
+            "textContent is appropriate when inserting text",
+            "classList is useful for UI state changes",
+            "Modules make dependencies explicit",
+            "Keep modules focused & expose only what other modules need"
           ],
           note: ""
         },
@@ -417,8 +418,8 @@ export default {
             "Transform data",
             "Update application state / UI",
             "Important detail",
-            "fetch() rejects for network-level failures.",
-            "HTTP 404/500 does not automatically reject."
+            "fetch() rejects for network-level failures",
+            "HTTP 404/500 does not automatically reject"
           ],
           note: ""
         }
@@ -469,7 +470,7 @@ export default {
           title: "Technical Checkpoint",
           bullets: [
             "2. What is the difference between == and ===?",
-            "3. Explain lexical scope.",
+            "3. Explain lexical scope",
             "4. What is a closure?",
             "6. What is event bubbling?",
             "7. Why does fetch() not reject on HTTP 404 by default?",
@@ -480,13 +481,13 @@ export default {
         {
           title: "Key Takeaways",
           bullets: [
-            "JavaScript fundamentals are still critical: types, scope, functions, objects and control flow.",
-            "Modern syntax improves readability, but the underlying language model still matters.",
-            "DOM + events explain browser interaction.",
-            "Promises + async/await explain most application-level asynchronous work.",
-            "fetch() connects JavaScript to APIs and real data.",
-            "DevTools should be part of everyday debugging.",
-            "Use AI as an accelerator — not a replacement for engineering judgment."
+            "JavaScript fundamentals are still critical: types, scope, functions, objects and control flow",
+            "Modern syntax improves readability, but the underlying language model still matters",
+            "DOM + events explain browser interaction",
+            "Promises + async/await explain most application-level asynchronous work",
+            "fetch() connects JavaScript to APIs and real data",
+            "DevTools should be part of everyday debugging",
+            "Use AI as an accelerator — not a replacement for engineering judgment"
           ],
           note: ""
         }
@@ -501,12 +502,12 @@ export default {
           bullets: [
             "Simple exercise — let / const",
             "YOUR TASK",
-            "Create variables for name, age and isActive.",
-            "Print all three values.",
+            "Create variables for name, age and isActive",
+            "Print all three values",
             "EXPECTED OUTCOME",
             "Console should show the three values. Change age",
-            "and observe the output.",
-            "Tip: run the code, change one value, and observe the result."
+            "and observe the output",
+            "Tip: run the code, change one value, and observe the result"
           ],
           note: ""
         },
@@ -515,11 +516,11 @@ export default {
           bullets: [
             "Simple exercise — typeof",
             "YOUR TASK",
-            "Create one string, number, boolean and undefined value.",
-            "Use typeof on each.",
+            "Create one string, number, boolean and undefined value",
+            "Use typeof on each",
             "EXPECTED OUTCOME",
-            "You should see string, number, boolean and undefined.",
-            "Tip: run the code, change one value, and observe the result."
+            "You should see string, number, boolean and undefined",
+            "Tip: run the code, change one value, and observe the result"
           ],
           note: ""
         },
@@ -528,11 +529,11 @@ export default {
           bullets: [
             "Simple exercise — arithmetic + comparison",
             "YOUR TASK",
-            "Calculate total price for 3 items.",
-            "Check whether the total is greater than 100.",
+            "Calculate total price for 3 items",
+            "Check whether the total is greater than 100",
             "EXPECTED OUTCOME",
-            "The total is 105, so the comparison should be true.",
-            "Tip: run the code, change one value, and observe the result."
+            "The total is 105, so the comparison should be true",
+            "Tip: run the code, change one value, and observe the result"
           ],
           note: ""
         },
@@ -541,11 +542,11 @@ export default {
           bullets: [
             "Simple exercise — if / else",
             "YOUR TASK",
-            "Create a score variable.",
-            "Print Pass when score >= 50, otherwise Fail.",
+            "Create a score variable",
+            "Print Pass when score >= 50, otherwise Fail",
             "EXPECTED OUTCOME",
-            "Change the score to 40 and verify that the result changes.",
-            "Tip: run the code, change one value, and observe the result."
+            "Change the score to 40 and verify that the result changes",
+            "Tip: run the code, change one value, and observe the result"
           ],
           note: ""
         },
@@ -554,11 +555,11 @@ export default {
           bullets: [
             "Simple exercise — for loop",
             "YOUR TASK",
-            "Print numbers 1 to 10.",
-            "Then change the loop to print only even numbers.",
+            "Print numbers 1 to 10",
+            "Then change the loop to print only even numbers",
             "EXPECTED OUTCOME",
-            "First see 1–10. Then use a condition such as i % 2 === 0.",
-            "Tip: run the code, change one value, and observe the result."
+            "First see 1–10. Then use a condition such as i % 2 === 0",
+            "Tip: run the code, change one value, and observe the result"
           ],
           note: ""
         },
@@ -567,11 +568,11 @@ export default {
           bullets: [
             "Simple exercise — parameters + return",
             "YOUR TASK",
-            "Create add(a, b).",
-            "Return the sum and print add(10, 20).",
+            "Create add(a, b)",
+            "Return the sum and print add(10, 20)",
             "EXPECTED OUTCOME",
-            "The output should be 30. Try add(5, 7) next.",
-            "Tip: run the code, change one value, and observe the result."
+            "The output should be 30. Try add(5, 7) next",
+            "Tip: run the code, change one value, and observe the result"
           ],
           note: ""
         },
@@ -580,10 +581,10 @@ export default {
           bullets: [
             "Simple exercise — arrow syntax",
             "YOUR TASK",
-            "Create square(n) too.",
+            "Create square(n) too",
             "EXPECTED OUTCOME",
-            "You should be able to call add(2,3) and square(5).",
-            "Tip: run the code, change one value, and observe the result."
+            "You should be able to call add(2,3) and square(5)",
+            "Tip: run the code, change one value, and observe the result"
           ],
           note: ""
         },
@@ -592,11 +593,11 @@ export default {
           bullets: [
             "Simple exercise — map()",
             "YOUR TASK",
-            "Given prices, create a new array with 10% tax added.",
-            "Do not change the original array.",
+            "Given prices, create a new array with 10% tax added",
+            "Do not change the original array",
             "EXPECTED OUTCOME",
-            "Expected result: [110, 220, 330].",
-            "Tip: run the code, change one value, and observe the result."
+            "Expected result: [110, 220, 330]",
+            "Tip: run the code, change one value, and observe the result"
           ],
           note: ""
         },
@@ -605,10 +606,10 @@ export default {
           bullets: [
             "Simple exercise — filter()",
             "YOUR TASK",
-            "From the numbers array, keep only numbers greater than 50.",
+            "From the numbers array, keep only numbers greater than 50",
             "EXPECTED OUTCOME",
-            "Expected result: [75, 90, 60].",
-            "Tip: run the code, change one value, and observe the result."
+            "Expected result: [75, 90, 60]",
+            "Tip: run the code, change one value, and observe the result"
           ],
           note: ""
         },
@@ -617,11 +618,11 @@ export default {
           bullets: [
             "Simple exercise — reduce()",
             "YOUR TASK",
-            "Calculate the total of all prices.",
-            "Start with an accumulator of 0.",
+            "Calculate the total of all prices",
+            "Start with an accumulator of 0",
             "EXPECTED OUTCOME",
-            "Expected total: 350.",
-            "Tip: run the code, change one value, and observe the result."
+            "Expected total: 350",
+            "Tip: run the code, change one value, and observe the result"
           ],
           note: ""
         },
@@ -630,11 +631,11 @@ export default {
           bullets: [
             "Simple exercise — property access + update",
             "YOUR TASK",
-            "Create an employee object with name and role.",
-            "Update the role.",
+            "Create an employee object with name and role",
+            "Update the role",
             "EXPECTED OUTCOME",
-            "Reading employee.role after the update should return Lead.",
-            "Tip: run the code, change one value, and observe the result."
+            "Reading employee.role after the update should return Lead",
+            "Tip: run the code, change one value, and observe the result"
           ],
           note: ""
         },
@@ -643,11 +644,11 @@ export default {
           bullets: [
             "Simple exercise — object destructuring",
             "YOUR TASK",
-            "Extract name and role from employee.",
-            "Print both values.",
+            "Extract name and role from employee",
+            "Print both values",
             "EXPECTED OUTCOME",
-            "You should have two local variables: name and role.",
-            "Tip: run the code, change one value, and observe the result."
+            "You should have two local variables: name and role",
+            "Tip: run the code, change one value, and observe the result"
           ],
           note: ""
         }
@@ -722,7 +723,7 @@ export default {
         {
           title: "The bridge: from college to a real team",
           bullets: [
-            "The syntax is only the starting point.",
+            "The syntax is only the starting point",
             "College",
             "Solve the problem",
             "Make it work",
@@ -772,7 +773,7 @@ export default {
         {
           title: "Semantic tags: give the page meaning",
           bullets: [
-            "Good HTML helps humans, browsers, search engines and assistive tech.",
+            "Good HTML helps humans, browsers, search engines and assistive tech",
             "<header>",
             "Page / section header",
             "<nav>",
@@ -788,7 +789,7 @@ export default {
         {
           title: "Block vs Inline + Attributes",
           bullets: [
-            "Know what the browser does before CSS changes it.",
+            "Know what the browser does before CSS changes it",
             "BLOCK",
             "div p h1 section",
             "Starts on a new line Takes available width by default",
@@ -802,7 +803,7 @@ export default {
         {
           title: "Accessibility in Design Implementation",
           bullets: [
-            "Build UI that people can actually use.",
+            "Build UI that people can actually use",
             "Label inputs",
             "CODE",
             "<label htmlFor=\"email\">",
@@ -838,14 +839,14 @@ export default {
         {
           title: "Next stop: CSS",
           bullets: [
-            "Layout, spacing, positioning and responsive thinking."
+            "Layout, spacing, positioning and responsive thinking"
           ],
           note: ""
         },
         {
           title: "The Box Model",
           bullets: [
-            "Every element is a box. Learn to see the invisible space.",
+            "Every element is a box. Learn to see the invisible space",
             "MARGIN",
             "BORDER",
             "PADDING",
@@ -861,7 +862,7 @@ export default {
         {
           title: "Display + Flexbox",
           bullets: [
-            "Most everyday UI layout problems can be solved with a small set of flex concepts.",
+            "Most everyday UI layout problems can be solved with a small set of flex concepts",
             "DISPLAY",
             "block",
             "inline",
@@ -877,7 +878,7 @@ export default {
         {
           title: "Positioning: know what you are positioning against",
           bullets: [
-            "Relative, absolute, fixed and sticky solve different problems.",
+            "Relative, absolute, fixed and sticky solve different problems",
             "relative",
             "moves from its normal position",
             "absolute",
@@ -909,14 +910,14 @@ export default {
         {
           title: "Next stop: TypeScript",
           bullets: [
-            "Just enough type safety to make React easier to reason about."
+            "Just enough type safety to make React easier to reason about"
           ],
           note: ""
         },
         {
           title: "TypeScript for React",
           bullets: [
-            "Types are contracts between your data and your UI.",
+            "Types are contracts between your data and your UI",
             "CODE",
             "Types Interfaces Enums Unions Functions null/undefined optional chaining"
           ],
@@ -931,14 +932,14 @@ export default {
         {
           title: "Next stop: React",
           bullets: [
-            "Components + state + events + data flow."
+            "Components + state + events + data flow"
           ],
           note: ""
         },
         {
           title: "JSX: markup meets JavaScript",
           bullets: [
-            "The goal isn't “HTML inside JS” — it's a declarative description of UI.",
+            "The goal isn't “HTML inside JS” — it's a declarative description of UI",
             "CODE",
             "className",
             "JSX attribute",
@@ -954,7 +955,7 @@ export default {
         {
           title: "Props vs State",
           bullets: [
-            "One flows in. The other is owned and can change.",
+            "One flows in. The other is owned and can change",
             "PROPS",
             "Passed from parent to child",
             "Read-only from the child's point of view",
@@ -963,14 +964,14 @@ export default {
             "Component memory",
             "Changes over time",
             "Updating state requests a re-render",
-            "When two components need to coordinate → lift state to their closest common parent."
+            "When two components need to coordinate → lift state to their closest common parent"
           ],
           note: ""
         },
         {
           title: "Rendering & re-rendering",
           bullets: [
-            "Think in snapshots: state changes → React renders again.",
+            "Think in snapshots: state changes → React renders again",
             "USER",
             "click / type",
             "EVENT",
@@ -998,7 +999,7 @@ export default {
         {
           title: "Hooks: when do I use what?",
           bullets: [
-            "Learn the problem each Hook solves.",
+            "Learn the problem each Hook solves",
             "useState",
             "component memory",
             "useEffect",
@@ -1007,24 +1008,24 @@ export default {
             "persist a value / DOM reference",
             "useContext",
             "read shared context",
-            "Rule: Hooks live at the top level of React components / custom Hooks."
+            "Rule: Hooks live at the top level of React components / custom Hooks"
           ],
           note: ""
         },
         {
           title: "Lists + conditional rendering",
           bullets: [
-            "Most product UIs are “data → list → conditions”.",
+            "Most product UIs are “data → list → conditions”",
             "CODE",
             "KEYS",
-            "Stable identity helps React track list items. Avoid array index when order can change."
+            "Stable identity helps React track list items. Avoid array index when order can change"
           ],
           note: ""
         },
         {
           title: "API integration + async flow",
           bullets: [
-            "A real UI is a state machine around data.",
+            "A real UI is a state machine around data",
             "IDLE",
             "screen opens",
             "LOADING",
@@ -1040,7 +1041,7 @@ export default {
         {
           title: "Error handling: “works on my machine” is not a feature",
           bullets: [
-            "Good frontend code anticipates failure.",
+            "Good frontend code anticipates failure",
             "Loading",
             "Give feedback",
             "Error",
@@ -1056,7 +1057,7 @@ export default {
         {
           title: "Routing, navigation & debugging",
           bullets: [
-            "A corporate app is more than one screen — and debugging is part of development.",
+            "A corporate app is more than one screen — and debugging is part of development",
             "ROUTING",
             "/",
             "Home",
@@ -1078,7 +1079,7 @@ export default {
         {
           title: "CSS frameworks & icons",
           bullets: [
-            "Corporate work often means using an ecosystem — not reinventing every button.",
+            "Corporate work often means using an ecosystem — not reinventing every button",
             "CSS",
             "Foundation",
             "Write your own styles",
@@ -1094,7 +1095,7 @@ export default {
         {
           title: "Put the pieces together",
           bullets: [
-            "A corporate frontend developer connects all of these layers.",
+            "A corporate frontend developer connects all of these layers",
             "HTML",
             "Structure",
             "CSS",

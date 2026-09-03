@@ -112,13 +112,13 @@ export async function seedIfEmpty(db, { log = () => {} } = {}) {
   const { n } = db.prepare('SELECT COUNT(*) AS n FROM sessions').get();
   if (n > 0) return { seeded: false, rosterCount };
   const insert = db.prepare(
-    `INSERT INTO sessions (key, day_no, date, week, module, title, subtopics, trainers, join_code, slides_key)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO sessions (key, day_no, date, week, module, title, subtopics, trainers, trainer_emails, join_code, slides_key)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   let questions = 0;
   for (const s of schedule) {
     const code = uniqueJoinCode(db);
-    const { lastInsertRowid } = insert.run(s.key, s.dayNo, s.date, s.week, s.module, s.title, s.subtopics, JSON.stringify(s.trainers), code, s.slidesKey || null);
+    const { lastInsertRowid } = insert.run(s.key, s.dayNo, s.date, s.week, s.module, s.title, s.subtopics, JSON.stringify(s.trainers), JSON.stringify(s.trainerEmails || []), code, s.slidesKey || null);
     const bank = await loadQuestionBank(s.key);
     insertQuestions(db, Number(lastInsertRowid), bank);
     questions += bank.length;

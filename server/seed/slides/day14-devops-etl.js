@@ -28,7 +28,7 @@ export default {
             "04 — Kubernetes: orchestration at scale",
             "05 — CI/CD: automate build, test and deployment",
             "06 — Ferguson context, AI leverage, labs & recap",
-            "We will learn in the order the tools appear in a real delivery flow."
+            "We will learn in the order the tools appear in a real delivery flow"
           ],
           note: "",
           agenda: [
@@ -148,12 +148,12 @@ export default {
         {
           title: "Trainer – Vishnu Chaturvedi",
           bullets: [
-            "10 Years of Experience in Backend Development.",
-            "Currently working as a Lead Engineer – Product Domain at Ferguson.",
-            "Joined Ferguson in April 2025, part of TIF-Middleware.",
-            "Core Expertise: Java, Spring Boot, MongoDB, Elasticsearch and Backend Systems.",
-            "Passionate about technology, problem solving & knowledge sharing.",
-            "Hobbies: Chess & exploring new technologies."
+            "10 Years of Experience in Backend Development",
+            "Currently working as a Lead Engineer – Product Domain at Ferguson",
+            "Joined Ferguson in April 2025, part of TIF-Middleware",
+            "Core Expertise: Java, Spring Boot, MongoDB, Elasticsearch and Backend Systems",
+            "Passionate about technology, problem solving & knowledge sharing",
+            "Hobbies: Chess & exploring new technologies"
           ],
           note: ""
         }
@@ -198,7 +198,7 @@ export default {
             "Hard to answer: who changed this, when, and why?",
             "Rollback becomes risky when a release breaks",
             "Git gives history, parallel work, review and recovery",
-            "Analogy: Git is a time machine + collaboration ledger for source code."
+            "Analogy: Git is a time machine + collaboration ledger for source code"
           ],
           note: ""
         },
@@ -235,16 +235,16 @@ export default {
         {
           title: "Git: Your First Local Workflow",
           bullets: [
-            "A small change moves from working tree → staging → local history.",
+            "A small change moves from working tree → staging → local history",
             "git status git add src/main/java/ProductService.java git commit -m \"Add product validation\" git log --oneline -5",
-            "Key takeaway: Commit messages should describe the intent of the change, not just “changes done”."
+            "Key takeaway: Commit messages should describe the intent of the change, not just “changes done”"
           ],
           note: ""
         },
         {
           title: "Clone, Pull and Push",
           bullets: [
-            "Use the remote repository to synchronize with your team.",
+            "Use the remote repository to synchronize with your team",
             "git clone <repository-url> cd product-service git pull origin main # make changes + commit git push origin feature/product-validation"
           ],
           note: ""
@@ -254,20 +254,20 @@ export default {
           bullets: [
             "main",
             "Stable baseline",
-            "feature/...",
+            "feature/",
             "Your isolated work",
             "PR",
             "Review + checks",
             "merge",
             "Integrate safely",
-            "A branch is a lightweight pointer to commits — not a full copy of the project."
+            "A branch is a lightweight pointer to commits — not a full copy of the project"
           ],
           note: ""
         },
         {
           title: "Branching Commands",
           bullets: [
-            "Create a branch for one focused change.",
+            "Create a branch for one focused change",
             "git switch main git pull git switch -c feature/add-vendor-api # edit, add, commit git push -u origin feature/add-vendor-api"
           ],
           note: ""
@@ -296,7 +296,7 @@ export default {
             "Developer must understand intent — not blindly choose one side",
             "Resolve file → test → git add → continue commit/rebase",
             "Communicate with the other author when business logic is unclear",
-            "Conflict resolution is a collaboration problem first, a Git problem second."
+            "Conflict resolution is a collaboration problem first, a Git problem second"
           ],
           note: ""
         },
@@ -328,7 +328,7 @@ export default {
             "Bad local commit → amend or reset depending on whether it was pushed",
             "Bad shared commit → prefer revert to preserve history",
             "Never force-push a shared branch unless team policy explicitly allows it",
-            "Rule: before destructive commands, run git status and understand whether work is local or already shared."
+            "Rule: before destructive commands, run git status and understand whether work is local or already shared"
           ],
           note: ""
         }
@@ -389,16 +389,16 @@ export default {
         {
           title: "Dockerfile — Spring Boot Example",
           bullets: [
-            "A Dockerfile describes how to construct the runtime image.",
+            "A Dockerfile describes how to construct the runtime image",
             "FROM eclipse-temurin:21-jre WORKDIR /app COPY target/product-service.jar app.jar EXPOSE 8080 ENTRYPOINT [\"java\",\"-jar\",\"app.jar\"]",
-            "Key takeaway: Prefer small, trusted base images and keep the image focused on one application process."
+            "Key takeaway: Prefer small, trusted base images and keep the image focused on one application process"
           ],
           note: ""
         },
         {
           title: "Build and Run an Image",
           bullets: [
-            "Build from the Dockerfile, then map a host port to the container.",
+            "Build from the Dockerfile, then map a host port to the container",
             "docker build -t product-service:1.0 . docker images docker run --name product-api -p 8080:8080 product-service:1.0 docker ps"
           ],
           note: ""
@@ -411,7 +411,7 @@ export default {
             "Runtime configuration should come from environment/config, not image rebuilds",
             "Never bake passwords or tokens into an image",
             "Same image should move across environments with different configuration",
-            "Immutable artifact + externalized configuration is a core delivery principle."
+            "Immutable artifact + externalized configuration is a core delivery principle"
           ],
           note: ""
         },
@@ -430,7 +430,7 @@ export default {
         {
           title: "Docker Debugging Commands",
           bullets: [
-            "Use these to understand a running or failed container.",
+            "Use these to understand a running or failed container",
             "docker ps -a docker logs -f product-api docker inspect product-api docker exec -it product-api sh docker stop product-api docker rm product-api"
           ],
           note: ""
@@ -459,7 +459,7 @@ export default {
             "Do not put secrets in Dockerfile or image layers",
             "Use multi-stage builds when compilation tools are not needed at runtime",
             "Scan images and update vulnerable base images",
-            "Security and repeatability start during image construction, not after deployment."
+            "Security and repeatability start during image construction, not after deployment"
           ],
           note: ""
         },
@@ -472,7 +472,7 @@ export default {
             "Run on localhost:8080 and call /health",
             "Change the app, rebuild as 1.1 and compare image IDs",
             "Stop/remove the container and prove the image still exists",
-            "Bonus: pass an environment variable and print it from the application."
+            "Bonus: pass an environment variable and print it from the application"
           ],
           note: ""
         }
@@ -496,7 +496,7 @@ export default {
             "How does traffic find healthy instances?",
             "How do we roll out a new version safely?",
             "Kubernetes automates scheduling, healing, scaling and rollout mechanics",
-            "Kubernetes is an orchestration platform, not a replacement for Docker images."
+            "Kubernetes is an orchestration platform, not a replacement for Docker images"
           ],
           note: ""
         },
@@ -512,7 +512,7 @@ export default {
             "Stable access",
             "USERS",
             "Send requests",
-            "You declare desired state. Kubernetes continuously tries to make actual state match it."
+            "You declare desired state. Kubernetes continuously tries to make actual state match it"
           ],
           note: ""
         },
@@ -524,7 +524,7 @@ export default {
             "Pods are ephemeral: their names/IPs can change",
             "Normally you do not manually create production Pods",
             "Deployments manage Pods for stateless applications",
-            "Think “replaceable instance”, not “pet server”."
+            "Think “replaceable instance”, not “pet server”"
           ],
           note: ""
         },
@@ -562,7 +562,7 @@ export default {
             "Labels/selectors connect Services to Pods",
             "Traffic can be load-balanced across healthy endpoints",
             "Common types: ClusterIP, NodePort, LoadBalancer",
-            "Clients should depend on stable service discovery, not individual Pod IP addresses."
+            "Clients should depend on stable service discovery, not individual Pod IP addresses"
           ],
           note: ""
         },
@@ -574,7 +574,7 @@ export default {
             "Both can be exposed as environment variables or mounted files",
             "Do not commit real secrets into Git",
             "Changing configuration may require workload restart depending on how app reads it",
-            "“Secret” is an API object type — proper encryption/access controls still matter."
+            "“Secret” is an API object type — proper encryption/access controls still matter"
           ],
           note: ""
         },
@@ -586,7 +586,7 @@ export default {
             "Too-low memory limit can cause OOMKilled",
             "No requests can lead to noisy-neighbor behavior",
             "Observe real usage before tuning production values",
-            "Resource settings are capacity-planning inputs, not arbitrary numbers."
+            "Resource settings are capacity-planning inputs, not arbitrary numbers"
           ],
           note: ""
         },
@@ -598,16 +598,16 @@ export default {
             "Startup probes protect slow-starting applications",
             "Bad probe settings can create restart loops",
             "Health endpoint must represent meaningful application health",
-            "A running process is not automatically a ready application."
+            "A running process is not automatically a ready application"
           ],
           note: ""
         },
         {
           title: "kubectl — First Commands",
           bullets: [
-            "Use kubectl to inspect cluster resources and troubleshoot.",
+            "Use kubectl to inspect cluster resources and troubleshoot",
             "kubectl get pods kubectl get deployments kubectl get svc kubectl describe pod <pod-name> kubectl logs <pod-name> kubectl get events --sort-by=.lastTimestamp",
-            "Key takeaway: Observe first. “Describe + logs + events” is a strong beginner troubleshooting sequence."
+            "Key takeaway: Observe first. “Describe + logs + events” is a strong beginner troubleshooting sequence"
           ],
           note: ""
         },
@@ -615,7 +615,7 @@ export default {
           title: "A Minimal Deployment Manifest",
           bullets: [
             "apiVersion: apps/v1 kind: Deployment metadata: name: product-service spec: replicas: 2 template: spec: containers: - name: app image:…",
-            "Key takeaway: Real manifests also need selectors/labels, probes, resources and configuration."
+            "Key takeaway: Real manifests also need selectors/labels, probes, resources and configuration"
           ],
           note: ""
         },
@@ -630,7 +630,7 @@ export default {
             "Drain old Pods",
             "v2 v2 v2",
             "Rollout complete",
-            "A rolling strategy replaces instances gradually so the service can remain available during deployment."
+            "A rolling strategy replaces instances gradually so the service can remain available during deployment"
           ],
           note: ""
         },
@@ -709,15 +709,15 @@ export default {
             "Image push: registry auth/tag conflict",
             "Deploy: invalid manifest, quota, readiness failure",
             "Post-deploy: smoke test or monitoring indicates regression",
-            "A good pipeline makes the failure stage obvious and leaves enough logs to diagnose it."
+            "A good pipeline makes the failure stage obvious and leaves enough logs to diagnose it"
           ],
           note: ""
         },
         {
           title: "Jenkins-Style Pipeline Example",
           bullets: [
-            "Illustrative flow — exact syntax varies by organization and shared libraries.",
-            "Key takeaway: Pipeline-as-code makes delivery logic reviewable, versioned and repeatable."
+            "Illustrative flow — exact syntax varies by organization and shared libraries",
+            "Key takeaway: Pipeline-as-code makes delivery logic reviewable, versioned and repeatable"
           ],
           note: ""
         },
@@ -742,7 +742,7 @@ export default {
             "Ask for a troubleshooting checklist before executing commands",
             "Never paste credentials, secrets or restricted company data",
             "Verify commands in docs/team standards before running against shared environments",
-            "Best prompt pattern: context + symptom + expected behavior + constraints + what you already checked."
+            "Best prompt pattern: context + symptom + expected behavior + constraints + what you already checked"
           ],
           note: ""
         }
@@ -820,8 +820,8 @@ export default {
             "I’m a Senior Data Engineer at Ferguson, with over 8 years of experience in ETL, Data Engineering, and Data Warehousing. My core expertise includes SQL,…",
             "Career question: “Do I enjoy building pipelines, solving data problems, or turning data into business outcomes?”",
             "Challenge yourself",
-            "Master a tool at a time, pick a direction.",
-            "Learn the “why” first → practice the “how” → automate the repeatable.",
+            "Master a tool at a time, pick a direction",
+            "Learn the “why” first → practice the “how” → automate the repeatable",
             "Progressive Mindset"
           ],
           note: ""
@@ -862,7 +862,7 @@ export default {
             "Store data for analytics/use",
             "SERVE",
             "Reports, apps, models, decisions",
-            "Modern cloud pipelines often use ELT as well: load first, transform in the target platform.",
+            "Modern cloud pipelines often use ELT as well: load first, transform in the target platform",
             "ETL"
           ],
           note: ""
@@ -887,11 +887,11 @@ export default {
           title: "Azure Blob Storage — The Landing Zone",
           bullets: [
             "What it is",
-            "Cloud object storage for files / blobs. Think: folders + files, not relational tables.",
+            "Cloud object storage for files / blobs. Think: folders + files, not relational tables",
             "Where it fits",
-            "Raw landing → processed data → curated outputs. Useful for CSV, JSON, Parquet and other files.",
+            "Raw landing → processed data → curated outputs. Useful for CSV, JSON, Parquet and other files",
             "Key idea",
-            "Separate storage from compute. Databricks can read/write files without being the permanent storage layer.",
+            "Separate storage from compute. Databricks can read/write files without being the permanent storage layer",
             "Blob container — illustrative snapshot",
             "Example folder structure",
             "raw/ sales/ 2026-08-31.csv curated/ sales/ sales_delta/",
@@ -919,11 +919,11 @@ export default {
           title: "Azure Databricks — Transform at Scale",
           bullets: [
             "What it is",
-            "Lakehouse analytics platform built around Apache Spark. Commonly used for large-scale transformation.",
+            "Lakehouse analytics platform built around Apache Spark. Commonly used for large-scale transformation",
             "What you write",
-            "Notebooks / Python / PySpark / SQL Read → transform → write Reusable jobs for production workloads.",
+            "Notebooks / Python / PySpark / SQL Read → transform → write Reusable jobs for production workloads",
             "Why freshers like it",
-            "Python + SQL + distributed processing. A bridge between software skills and data engineering.",
+            "Python + SQL + distributed processing. A bridge between software skills and data engineering",
             "PySpark example",
             "Illustrative",
             "df = spark.read.parquet(\"/mnt/raw/sales\") clean = (df.dropDuplicates([\"OrderId\"]) .filter(\"Amount > 0\")) clean.write.format(\"delta\").mode(\"append\")…",
@@ -942,7 +942,7 @@ export default {
             "Retries logs duration success/failure",
             "Two common patterns",
             "Pattern A — Databricks owns the schedule",
-            "Simple recurring transformation that can run independently.",
+            "Simple recurring transformation that can run independently",
             "Pattern B — ADF orchestrates the job"
           ],
           note: ""
@@ -951,7 +951,7 @@ export default {
           title: "GitHub — Version Control for Data Engineering",
           bullets: [
             "Why GitHub matters",
-            "History + collaboration + code review. Your pipeline code should be reproducible, not trapped in a laptop.",
+            "History + collaboration + code review. Your pipeline code should be reproducible, not trapped in a laptop",
             "What lives in a repo",
             "PySpark / Python SQL scripts ADF pipeline definitions / templates README + tests + config",
             "Core workflow",
@@ -1009,10 +1009,10 @@ export default {
             "Exercise 1 — SQL",
             "Create a sales query: filter by date join customer data aggregate by customer add a data-quality check",
             "Exercise 2 — Databricks",
-            "Read a CSV / Parquet file → clean duplicates → add a derived column → write curated output.",
+            "Read a CSV / Parquet file → clean duplicates → add a derived column → write curated output",
             "Exercise 3 — ADF",
-            "Build: Trigger → Copy / Lookup → Databricks → success/failure. Parameterize the date.",
-            "Mini challenge: draw the architecture before opening any Azure screen.",
+            "Build: Trigger → Copy / Lookup → Databricks → success/failure. Parameterize the date",
+            "Mini challenge: draw the architecture before opening any Azure screen",
             "✓ Can I explain ETL vs ELT?",
             "✓ Can I write a clean SQL JOIN?",
             "✓ Can I explain Blob vs SQL Server?"
@@ -1030,7 +1030,7 @@ export default {
             "SQL → semantic models → Power BI → business storytelling",
             "Platform / DevOps",
             "Git → CI/CD → IaC → monitoring → cloud operations",
-            "Recommendation: build strong SQL + data fundamentals first, then specialize."
+            "Recommendation: build strong SQL + data fundamentals first, then specialize"
           ],
           note: ""
         },
@@ -1039,7 +1039,7 @@ export default {
           bullets: [
             "Santoshini Panda",
             "Santoshini.panda@ferguson.com",
-            "Start small. Build one pipeline. Understand every box.",
+            "Start small. Build one pipeline. Understand every box",
             "Questions / Discussion",
             "SQL Azure Blob ADF Databricks GitHub"
           ],

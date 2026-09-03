@@ -1,9 +1,9 @@
-// "Ferguson_SQL_Tech_Refresher_Dushanth_V1.pptx" (Dushanth, 31 slides; the MongoDB half of the session has no deck yet)
+// "Ferguson_SQL_Tech_Refresher_Dushanth_V1.pptx" (Dushanth, slides 1–31) followed by "MongoDB.pptx" (Vishnu Chaturvedi, slides 32–71)
 // Text carried over slide by slide from the trainer's deck; the slides themselves are the exported
-// pictures under public/decks/day12-sql-mongodb/ (31 slides), so these bullets are talking points.
+// pictures under public/decks/day12-sql-mongodb/ (71 slides), so these bullets are talking points.
 export default {
   key: "day12-sql-mongodb",
-  title: "Tech Refresher – SQL",
+  title: "Tech Refresher – SQL & MongoDB",
   sections: [
     {
       id: "agenda",
@@ -113,6 +113,83 @@ export default {
                 "Recap – 8 Lines to Remember Forever",
                 "Thank you!"
               ]
+            },
+            {
+              id: "mongo-intro",
+              title: "MongoDB: intro",
+              count: 3,
+              first: [
+                "MongoDB Training",
+                "Agenda",
+                "Trainer – Vishnu Chaturvedi"
+              ]
+            },
+            {
+              id: "mongo-basics",
+              title: "MongoDB basics",
+              count: 3,
+              first: [
+                "What is MongoDB?",
+                "Key Concepts",
+                "Document Structure"
+              ]
+            },
+            {
+              id: "mongo-crud",
+              title: "CRUD operations",
+              count: 11,
+              first: [
+                "CRUD Operations - CREATE",
+                "CRUD Operations - CREATE",
+                "CRUD Operations - READ"
+              ]
+            },
+            {
+              id: "mongo-query",
+              title: "Query operators & indexing",
+              count: 5,
+              first: [
+                "Common Query Operators",
+                "Common Query Operators",
+                "Indexing for Performance"
+              ]
+            },
+            {
+              id: "mongo-agg",
+              title: "Aggregation framework",
+              count: 5,
+              first: [
+                "Aggregation Framework",
+                "Sales Data Aggregation Pipeline example",
+                "Pipeline stage: $match"
+              ]
+            },
+            {
+              id: "mongo-practice",
+              title: "Best practices & tools",
+              count: 2,
+              first: [
+                "Best practices",
+                "Tools and resouces"
+              ]
+            },
+            {
+              id: "mongo-quiz",
+              title: "MongoDB quick quizzes",
+              count: 10,
+              first: [
+                "Quick Quiz – MongoDB basics",
+                "Quick Quiz – MongoDB basics (answers)",
+                "Quick Quiz - CRUD Operations"
+              ]
+            },
+            {
+              id: "mongo-close",
+              title: "MongoDB wrap-up",
+              count: 1,
+              first: [
+                "Thank you!"
+              ]
             }
           ]
         }
@@ -141,13 +218,13 @@ export default {
         {
           title: "Why Do We Need SQL?",
           bullets: [
-            "Every application you have ever used stores data. SQL is the language we use to talk to that data.",
+            "Every application you have ever used stores data. SQL is the language we use to talk to that data",
             "👤 User",
             "clicks 'My Orders'",
             "📱 Application",
             "Java / .NET / Web",
             "📝 SQL Query",
-            "SELECT * FROM Orders...",
+            "SELECT * FROM Orders",
             "🗄️ Database",
             "rows come back!",
             "Where will YOU meet SQL at Ferguson?"
@@ -195,7 +272,7 @@ export default {
         {
           title: "SQL Command Families – The 5 Groups",
           bullets: [
-            "Every SQL statement you will ever write belongs to one of these five families.",
+            "Every SQL statement you will ever write belongs to one of these five families",
             "DDL",
             "Data Definition",
             "Defines structure of tables",
@@ -280,7 +357,7 @@ export default {
         {
           title: "Joins – Combining Tables (The Superpower!)",
           bullets: [
-            "Real data is split across tables. Joins stitch related tables back together using keys.",
+            "Real data is split across tables. Joins stitch related tables back together using keys",
             "INNER JOIN",
             "Only matches in BOTH",
             "LEFT JOIN",
@@ -319,7 +396,7 @@ export default {
             "ON e.DeptID = d.DeptID;",
             "-- RIGHT: ALL departments, emp if exists",
             "RIGHT JOIN Departments d",
-            "💡 The unmatched side is filled with NULL — that's your clue a LEFT/RIGHT join happened.",
+            "💡 The unmatched side is filled with NULL — that's your clue a LEFT/RIGHT join happened",
             "Real-time use: 'Show ALL customers and their orders — including customers who never ordered' → Customers LEFT JOIN Orders. Finding customers with NO orders?…"
           ],
           note: "LEFT & RIGHT JOIN (4 min) Left panel: 'LEFT JOIN keeps EVERY row of the left table - Employees. Sneha has no department, but she is NOT dropped - the department column simply shows NULL. Compare with INNER JOIN where she vanished.' Right panel: 'RIGHT JOIN is the mirror - every department survives, even HR which has no employees, and the employee side shows NULL.' Pro tip to share: most teams write everything as LEFT JOIN (just swap table order) - it reads more naturally. RIGHT JOIN is rare in real codebases. The POWER pattern: LEFT JOIN + WHERE right-side IS NULL = 'find rows WITHOUT a match'. Customers with no orders, products never sold, employees with no assigned project - this pattern appears everywhere including interviews. Interactive: 'How do I find departments with ZERO employees?' Answer: Departments LEFT JOIN Employees ON ... WHERE e.EmpID IS NULL."
@@ -365,7 +442,7 @@ export default {
         {
           title: "UNION vs UNION ALL – Stacking Results",
           bullets: [
-            "Joins combine tables SIDE-BY-SIDE (columns). UNION stacks results TOP-TO-BOTTOM (rows).",
+            "Joins combine tables SIDE-BY-SIDE (columns). UNION stacks results TOP-TO-BOTTOM (rows)",
             "SELECT City FROM Customers2024",
             "UNION",
             ">> Bengaluru, Chennai, Delhi",
@@ -373,7 +450,7 @@ export default {
             "UNION ALL",
             ">> Bengaluru, Chennai, Bengaluru, Delhi",
             "-- duplicates KEPT, faster!",
-            "📏 Rules for both: same number of columns, compatible data types, same column order. Column names come from the FIRST query.",
+            "📏 Rules for both: same number of columns, compatible data types, same column order. Column names come from the FIRST query",
             "⚡ Default to UNION ALL unless you truly need duplicates removed — free performance!"
           ],
           note: "UNION vs UNION ALL (3 min) First clarify the direction: 'Joins glue tables sideways - more COLUMNS. UNION glues results vertically - more ROWS. Example: customers from the 2024 table and the 2025 table stacked into one list.' The difference is one word: 'UNION quietly removes duplicate rows - Bengaluru appearing in both years shows once. UNION ALL keeps everything - Bengaluru shows twice. And because UNION must compare every row to find duplicates, it is SLOWER.' Practical advice: if you know duplicates cannot exist, or duplicates are meaningful (log entries, transactions), use UNION ALL - it is faster and safer for counts. Interactive: 'I am merging error logs from two servers to count total errors - UNION or UNION ALL?' Answer: UNION ALL - removing duplicates would corrupt the count."
@@ -418,8 +495,8 @@ export default {
             "RANK() OVER(ORDER BY Salary DESC) AS Rnk,",
             "DENSE_RANK() OVER(ORDER BY Salary DESC) AS DRnk",
             "FROM Employees;",
-            "Window functions: rank every row without collapsing them (unlike GROUP BY).",
-            "OVER(ORDER BY ...) defines the ranking order. Add PARTITION BY dept for per-group ranking.",
+            "Window functions: rank every row without collapsing them (unlike GROUP BY)",
+            "OVER(ORDER BY ...) defines the ranking order. Add PARTITION BY dept for per-group ranking",
             "Watch the TIE (Priya & Arun both earn 65,000)",
             "🧠 Remember",
             "ROW_NUMBER: always unique 1,2,3,4"
@@ -457,7 +534,7 @@ export default {
             "SELECT UserID FROM Users",
             "WHERE Email = @email",
             "AND PasswordHash = @hash;",
-            "0 rows = wrong login. Apps pass values as @parameters — never paste user input into SQL (security!).",
+            "0 rows = wrong login. Apps pass values as @parameters — never paste user input into SQL (security!)",
             "🛒 'My Orders' page",
             "Join orders with product info",
             "SELECT o.OrderID, o.OrderDate,"
@@ -467,31 +544,31 @@ export default {
         {
           title: "Best Practices – Write SQL Like a Pro",
           bullets: [
-            "✅ Name only the columns you need.",
-            "SELECT * drags every column across the network, breaks apps when columns change, and can't use covering indexes.",
-            "✅ Always pair DELETE / UPDATE with WHERE.",
+            "✅ Name only the columns you need",
+            "SELECT * drags every column across the network, breaks apps when columns change, and can't use covering indexes",
+            "✅ Always pair DELETE / UPDATE with WHERE",
             "Run it as a SELECT first to preview affected rows. No WHERE = every row changes!",
-            "✅ Use parameters, never string-concatenation.",
-            "WHERE Email = @email — prevents SQL Injection, the #1 web attack.",
-            "✅ Filter early, filter smart.",
-            "✅ Use readable formatting & aliases.",
-            "Keywords on new lines, meaningful aliases (e, d), comments for tricky logic — your teammates will thank you.",
-            "✅ Test on small data, mind the indexes."
+            "✅ Use parameters, never string-concatenation",
+            "WHERE Email = @email — prevents SQL Injection, the #1 web attack",
+            "✅ Filter early, filter smart",
+            "✅ Use readable formatting & aliases",
+            "Keywords on new lines, meaningful aliases (e, d), comments for tricky logic — your teammates will thank you",
+            "✅ Test on small data, mind the indexes"
           ],
           note: "BEST PRACTICES (3 min) Walk quickly - one line each: 1) SELECT * is lazy - name your columns. Apps break when someone adds a column and position-based code shifts. 2) The scariest moment in any developer's life is running DELETE without WHERE. Habit: write SELECT first, verify the rows, then change to DELETE. Say it twice - it will save someone's job someday. 3) Parameters (@email) instead of gluing strings - stops SQL Injection completely. Non-negotiable in application code. 4) Filter in the database, not in the application - fetching a million rows to keep a hundred wastes everything. And functions around indexed columns (YEAR(OrderDate)=2026) stop the index from being used - use date ranges instead. 5) Format for humans - SQL ignores whitespace, teammates do not. 6) While practising, add TOP 100 so mistakes are cheap; learn what indexes exist on your tables. Tip: share a 30-second story of a real (anonymised) production incident - freshers remember stories, not rules."
         },
         {
           title: "Common Mistakes – Learn From Others' Pain",
           bullets: [
-            "❌ = NULL instead of IS NULL.",
-            "WHERE Phone = NULL returns NOTHING — NULL never equals anything. Use IS NULL / IS NOT NULL.",
-            "❌ Forgetting the ON in a join.",
-            "Accidental CROSS JOIN — 10K × 10K = 100M rows, server crawls. Always write ON right after JOIN.",
-            "❌ Aggregates inside WHERE.",
-            "WHERE COUNT(*) > 5 → error! Groups don't exist yet. Move it to HAVING.",
-            "❌ Non-grouped column in SELECT.",
-            "SELECT Name, DeptID ... GROUP BY DeptID → error. Every non-aggregated column must be in GROUP BY.",
-            "❌ UPDATE / DELETE without WHERE.",
+            "❌ = NULL instead of IS NULL",
+            "WHERE Phone = NULL returns NOTHING — NULL never equals anything. Use IS NULL / IS NOT NULL",
+            "❌ Forgetting the ON in a join",
+            "Accidental CROSS JOIN — 10K × 10K = 100M rows, server crawls. Always write ON right after JOIN",
+            "❌ Aggregates inside WHERE",
+            "WHERE COUNT(*) > 5 → error! Groups don't exist yet. Move it to HAVING",
+            "❌ Non-grouped column in SELECT",
+            "SELECT Name, DeptID ... GROUP BY DeptID → error. Every non-aggregated column must be in GROUP BY",
+            "❌ UPDATE / DELETE without WHERE",
             "The classic career-limiting move — every row updated. Preview with SELECT first!"
           ],
           note: "COMMON MISTAKES (3 min) Frame it: 'Every senior engineer has made at least three of these. Make them here in training, not in production!' 1) = NULL: the query runs fine but returns nothing - the worst kind of bug, no error, just silence. NULL is unknown; unknown = unknown is still unknown. IS NULL only. 2) Missing ON: the join becomes a cross join and multiplies the tables. If a query suddenly returns crores of rows or hangs - check your ONs first. 3) Aggregates in WHERE: remember the execution order slide - WHERE runs before groups exist. HAVING is the place. 4) The GROUP BY rule: every SELECTed column is either grouped or aggregated - no exceptions. 5) UPDATE without WHERE - tell them about transactions: BEGIN TRAN, run it, check, COMMIT or ROLLBACK - a seatbelt while learning. 6) UNION dropping duplicates silently corrupts sums and counts - UNION ALL for merges. Interactive: read each card and ask 'What is wrong here?' before revealing - freshers love spotting mistakes."
@@ -507,13 +584,13 @@ export default {
           bullets: [
             "Shout your answers! First correct answer gets bragging rights (and maybe chocolate 🍫)",
             "Q1",
-            "Employees has 1,000 rows in 8 departments.",
+            "Employees has 1,000 rows in 8 departments",
             "How many rows does GROUP BY DeptID return?",
             "Q2",
             "Which query finds employees WITHOUT a department —",
             "INNER JOIN or LEFT JOIN ... WHERE d.DeptID IS NULL?",
             "Q3",
-            "Scores: 95, 88, 88, 76.",
+            "Scores: 95, 88, 88, 76",
             "What does DENSE_RANK give the last student?"
           ],
           note: "QUIZ (7-8 min) - run it with energy; give 20-30 seconds per question. A1: 8 rows - one per department. (If some employees have NULL DeptID, NULL forms its own group → 9.) A2: LEFT JOIN ... WHERE d.DeptID IS NULL. INNER JOIN drops non-matches entirely, so it can never find them. This pattern = 'find rows without a match'. A3: DENSE_RANK: 95→1, 88→2, 88→2, 76→3. No gaps. (RANK would give 4; ROW_NUMBER also 4.) A4: DELETE. TRUNCATE is all-or-nothing DDL - no WHERE allowed. A5: 'A' - the FIRST non-NULL from the left, then it stops (B is never reached). A6: True - UNION ALL just appends; UNION must find and remove duplicates first. Wrap: 'If you got 4+, you are genuinely ready for the hands-on. Let's write some SQL ourselves!'"
@@ -550,13 +627,13 @@ export default {
           bullets: [
             "Use the Employees & Departments tables from today. Write, run, and verify each query. (~8 min)",
             "Ex 1 SELECT + WHERE",
-            "List Name and Salary of all employees earning more than 52,000.",
+            "List Name and Salary of all employees earning more than 52,000",
             "Ex 2 LIKE",
-            "Find all employees whose name starts with the letter 'P'.",
+            "Find all employees whose name starts with the letter 'P'",
             "Ex 3 ORDER BY",
-            "Show all employees sorted by Salary — highest first.",
+            "Show all employees sorted by Salary — highest first",
             "Ex 4 Aggregates",
-            "Show the total, average, minimum and maximum salary of the company in one query.",
+            "Show the total, average, minimum and maximum salary of the company in one query",
             "Ex 5 GROUP BY"
           ],
           note: "LEVEL 1 SOLUTIONS (walk around, reveal after ~8 min): Ex1: SELECT Name, Salary FROM Employees WHERE Salary > 52000; Ex2: SELECT * FROM Employees WHERE Name LIKE 'P%'; Ex3: SELECT * FROM Employees ORDER BY Salary DESC; Ex4: SELECT SUM(Salary) AS Total, AVG(Salary) AS Avg, MIN(Salary) AS Min, MAX(Salary) AS Max FROM Employees; Ex5: SELECT DeptID, COUNT(*) AS EmpCount FROM Employees GROUP BY DeptID; Ex6: SELECT DeptID, COUNT(*) AS EmpCount FROM Employees GROUP BY DeptID HAVING COUNT(*) > 1; Coaching notes: In Ex2 someone will write LIKE '%P%' - discuss the difference (contains vs starts-with). In Ex6 someone will try WHERE COUNT(*)>1 - perfect teaching moment to reinforce WHERE vs HAVING."
@@ -568,11 +645,11 @@ export default {
             "Ex 7 INNER JOIN",
             "Show each employee's Name with their DeptName. Who is missing from the result, and why?",
             "Ex 8 LEFT JOIN + IS NULL",
-            "List employees who have NO department assigned.",
+            "List employees who have NO department assigned",
             "Ex 9 JOIN + GROUP BY",
-            "Show each DeptName with its average salary, highest average first.",
+            "Show each DeptName with its average salary, highest average first",
             "Ex 10 Subquery",
-            "List employees earning more than the company's average salary.",
+            "List employees earning more than the company's average salary",
             "Ex 11 COALESCE"
           ],
           note: "LEVEL 2 SOLUTIONS: Ex7: SELECT e.Name, d.DeptName FROM Employees e INNER JOIN Departments d ON e.DeptID = d.DeptID; → Sneha is missing (NULL DeptID never matches). Ex8: SELECT e.Name FROM Employees e LEFT JOIN Departments d ON e.DeptID = d.DeptID WHERE d.DeptID IS NULL; (or simply WHERE e.DeptID IS NULL on the single table - accept both, discuss the pattern.) Ex9: SELECT d.DeptName, AVG(e.Salary) AS AvgSal FROM Employees e JOIN Departments d ON e.DeptID = d.DeptID GROUP BY d.DeptName ORDER BY AvgSal DESC; Ex10: SELECT Name, Salary FROM Employees WHERE Salary > (SELECT AVG(Salary) FROM Employees); Ex11: SELECT Name, COALESCE(CAST(DeptID AS VARCHAR(10)), 'Not Assigned') AS Dept FROM Employees; → teaching point: COALESCE arguments must be type-compatible, hence the CAST. Ex12: DENSE_RANK() OVER(ORDER BY Salary DESC) - 'no gaps for ties' is the keyword pointing to DENSE_RANK. Close the exercise block by asking one volunteer to explain their Ex9 query aloud - explaining is the deepest form of learning."
@@ -601,6 +678,479 @@ export default {
           title: "Thank you!",
           bullets: [],
           note: "CLOSING (1 min) Say: 'Thank you all for the energy today! Welcome once again to Ferguson - you are joining a company where data truly matters, and today you took your first real step into it. My door - and my Teams chat - is always open. Happy querying!' Practical closers: share the deck + practice scripts on the team channel, share your Teams/email, and schedule a 30-min doubt-clearing session for next week while the material is fresh."
+        }
+      ]
+    },
+    {
+      id: "mongo-intro",
+      title: "MongoDB: intro",
+      slides: [
+        {
+          title: "MongoDB Training",
+          bullets: [
+            "08-Sep-2026",
+            "Vishnu Chaturvedi",
+            "NoSQL Database | Document-Oriented | Scalable"
+          ],
+          note: ""
+        },
+        {
+          title: "Agenda",
+          bullets: [
+            "01. What is MongoDB",
+            "02. Key concepts",
+            "03. Document structure",
+            "04. CRUD Operations",
+            "05. Common query operators",
+            "06. Indexing",
+            "07. Aggregation framework",
+            "08. Best Practices",
+            "09. Tools and resources"
+          ],
+          note: ""
+        },
+        {
+          title: "Trainer – Vishnu Chaturvedi",
+          bullets: [
+            "10 Years of Experience in Backend Development",
+            "Currently working as a Lead Engineer – Product Domain at Ferguson",
+            "Joined Ferguson in April 2025, part of TIF-Middleware",
+            "Core Expertise: Java, Spring Boot, MongoDB, Elasticsearch and Backend Systems",
+            "Passionate about technology, problem solving & knowledge sharing",
+            "Hobbies: Chess & exploring new technologies"
+          ],
+          note: ""
+        }
+      ]
+    },
+    {
+      id: "mongo-basics",
+      title: "MongoDB basics",
+      slides: [
+        {
+          title: "What is MongoDB?",
+          bullets: [
+            "Popular NoSQL database system",
+            "Document-oriented - stores data in JSON-like documents",
+            "Flexible schema - no predefined structure required",
+            "Horizontally scalable - supports sharding for large datasets",
+            "High availability - replica sets for redundancy and fault tolerance",
+            "Aggregation framework for complex data processing and analytics"
+          ],
+          note: ""
+        },
+        {
+          title: "Key Concepts",
+          bullets: [
+            "Core MongoDB Terminology"
+          ],
+          note: ""
+        },
+        {
+          title: "Document Structure",
+          bullets: [
+            "{",
+            "\"_id\": ObjectId(\"...\"),",
+            "\"name\": \"Laptop\",",
+            "\"category\": \"Electronics\",",
+            "\"price\": 50000,",
+            "\"inStock\": true,",
+            "\"tags\": [\"gadget\", \"tech\"],",
+            "\"specs\": {",
+            "\"processor\": \"Intel i7\",",
+            "\"ram\": \"16GB\""
+          ],
+          note: ""
+        }
+      ]
+    },
+    {
+      id: "mongo-crud",
+      title: "CRUD operations",
+      slides: [
+        {
+          title: "CRUD Operations - CREATE",
+          bullets: [
+            "Insert a single document – insertOne()",
+            "💡 Result: Automatically generates _id for each document insertOne() - adds single document",
+            "insertMany() - adds multiple documents in one operation",
+            "Both return InsertedIds for the new documents"
+          ],
+          note: ""
+        },
+        {
+          title: "CRUD Operations - CREATE",
+          bullets: [
+            "Persisting multiple documents – insertMany()"
+          ],
+          note: ""
+        },
+        {
+          title: "CRUD Operations - READ",
+          bullets: [
+            "Find all documents – find()",
+            "Find with filter condition",
+            "Find one document",
+            "Find with projection (Select specific fields)"
+          ],
+          note: ""
+        },
+        {
+          title: "CRUD Operations - READ",
+          bullets: [],
+          note: ""
+        },
+        {
+          title: "CRUD Operations - UPDATE",
+          bullets: [
+            "Updating a single document – updateOne()"
+          ],
+          note: ""
+        },
+        {
+          title: "CRUD Operations - UPDATE",
+          bullets: [
+            "Updating multiple documents– updateMany()"
+          ],
+          note: ""
+        },
+        {
+          title: "CRUD Operations – UPDATE",
+          bullets: [],
+          note: ""
+        },
+        {
+          title: "CRUD Operations – DELETE",
+          bullets: [
+            "Delete a single document – deleteOne()",
+            "Existing document"
+          ],
+          note: ""
+        },
+        {
+          title: "CRUD Operations – DELETE",
+          bullets: [
+            "Delete multiple document – deleteMany()"
+          ],
+          note: ""
+        },
+        {
+          title: "CRUD Operations – DELETE",
+          bullets: [
+            "Delete with Condition",
+            "Delete all documents – ( Use with caution ⚠️)"
+          ],
+          note: ""
+        },
+        {
+          title: "CRUD Operations – DELETE",
+          bullets: [
+            "⚠️ WARNING: Test with find() before deleting!",
+            "Always run db.collection.find(filter) FIRST to verify which documents will be deleted"
+          ],
+          note: ""
+        }
+      ]
+    },
+    {
+      id: "mongo-query",
+      title: "Query operators & indexing",
+      slides: [
+        {
+          title: "Common Query Operators",
+          bullets: [
+            "Essential Operators for Queries"
+          ],
+          note: ""
+        },
+        {
+          title: "Common Query Operators",
+          bullets: [
+            "Essential Operators for Queries"
+          ],
+          note: ""
+        },
+        {
+          title: "Indexing for Performance",
+          bullets: [
+            "Improve Query Speed with Indexes",
+            "Improves query performance by reducing scan time",
+            "Uses B-tree data structure for efficient lookups",
+            "Create Single Field Index"
+          ],
+          note: ""
+        },
+        {
+          title: "Indexing for Performance",
+          bullets: [
+            "Compound Index A compound index is an index that contains two or more fields from a document, allowing MongoDB to efficiently execute queries that use those…",
+            "Creating a compound index"
+          ],
+          note: ""
+        },
+        {
+          title: "Indexing for Performance",
+          bullets: [
+            "Unique Index A unique index ensures that a particular field (or combination of fields) cannot contain duplicate values in a MongoDB collection",
+            "Creating a unique index"
+          ],
+          note: ""
+        }
+      ]
+    },
+    {
+      id: "mongo-agg",
+      title: "Aggregation framework",
+      slides: [
+        {
+          title: "Aggregation Framework",
+          bullets: [
+            "Aggregation framework is a MongoDB feature used to process, transform, filter, group, and analyze data through a sequence of stages called a pipeline",
+            "$match – Filter documents based on conditions",
+            "$group – Group by a field and aggregate values",
+            "$sort – Sort documents by specified fields",
+            "$project – Select and reshape specific fields",
+            "$lookup – Perform joins with other collections"
+          ],
+          note: ""
+        },
+        {
+          title: "Sales Data Aggregation Pipeline example",
+          bullets: [
+            "Input collection: TRAINING_sales_data"
+          ],
+          note: ""
+        },
+        {
+          title: "Pipeline stage: $match",
+          bullets: [
+            "$match – Filter by condition Only sales after January 2024:"
+          ],
+          note: ""
+        },
+        {
+          title: "Pipeline stage: $group",
+          bullets: [
+            "$group – Aggregate by city Group by city and calculate totals"
+          ],
+          note: ""
+        },
+        {
+          title: "Pipeline stage: $project",
+          bullets: [
+            "$project – Reshape and rename fields Make fields names friendly and add calculations",
+            "Key concepts to remember",
+            "$match early: Filter first to reduce data processed by later stages",
+            "$group combines: Use $sum, $avg, $min, $max, $count to aggregate",
+            "$project reshapes: Pick, rename or compute fields for final output",
+            "Each stage transforms: Output of once stage becomes input of next"
+          ],
+          note: ""
+        }
+      ]
+    },
+    {
+      id: "mongo-practice",
+      title: "Best practices & tools",
+      slides: [
+        {
+          title: "Best practices",
+          bullets: [
+            "Always use indexes on frequently queried fields",
+            "Avoid deeply nested structures - keep schema flat",
+            "Use meaningful field names for clarity",
+            "Validate data before insertion",
+            "Use transaction for multi-document consistency",
+            "Monitor slow queries and optimize them",
+            "Plan sharding strategy for scalabilty",
+            "Regular backups and disaster recovery plan"
+          ],
+          note: ""
+        },
+        {
+          title: "Tools and resouces",
+          bullets: [
+            "MongoDB Shell (mongosh)",
+            "Command-line interface for MongoDB",
+            "MongoDB Compass",
+            "GUI for querying and data visualization",
+            "MongoDB Atlas",
+            "Cloud-hosted MongoDB service (free tier available)",
+            "Official Drivers",
+            "Node.js, Python, Java, Go, C#, Ruby, etc",
+            "MongoDB University",
+            "Free online courses and certifications"
+          ],
+          note: ""
+        }
+      ]
+    },
+    {
+      id: "mongo-quiz",
+      title: "MongoDB quick quizzes",
+      slides: [
+        {
+          title: "Quick Quiz – MongoDB basics",
+          bullets: [
+            "A) User ID",
+            "B) Unique Identifier (automatically created)",
+            "C) Collection ID",
+            "D) Database ID",
+            "Question 2: Which is correct comparison?",
+            "A) Database ≈ Table",
+            "B) Collection ≈ Table ✓",
+            "C) Document ≈ Column",
+            "D) Field ≈ Row",
+            "Quick Quiz - CRUD Operations"
+          ],
+          note: ""
+        },
+        {
+          title: "Quick Quiz – MongoDB basics (answers)",
+          bullets: [
+            "A) User ID",
+            "B) Unique Identifier (automatically created) ✓",
+            "C) Collection ID",
+            "D) Database ID",
+            "Question 2: Which is correct comparison?",
+            "A) Database ≈ Table",
+            "B) Collection ≈ Table ✓",
+            "C) Document ≈ Column",
+            "D) Field ≈ Row",
+            "Quick Quiz - CRUD Operations"
+          ],
+          note: ""
+        },
+        {
+          title: "Quick Quiz - CRUD Operations",
+          bullets: [
+            "Question 1: Which command inserts multiple documents?",
+            "A) insert()",
+            "B) insertOne()",
+            "C) insertMany()",
+            "D) addMany()",
+            "Question 2: What's WRONG with this update?",
+            "db.users.updateOne(",
+            "{ _id: 1 },",
+            "{ name: \"John\" }",
+            ")"
+          ],
+          note: ""
+        },
+        {
+          title: "Quick Quiz – CRUD Operations (answers)",
+          bullets: [
+            "Question 1: Which command inserts multiple documents?",
+            "A) insert()",
+            "B) insertOne()",
+            "C) insertMany() ✓",
+            "D) addMany()",
+            "Question 2: What's WRONG with this update?",
+            "db.users.updateOne(",
+            "{ _id: 1 },",
+            "{ name: \"John\" }",
+            ")"
+          ],
+          note: ""
+        },
+        {
+          title: "Quick Quiz - Query Operators",
+          bullets: [
+            "Question 1: What does $and operator do?",
+            "A) Matches if ANY condition is true",
+            "B) Matches if ALL conditions are true",
+            "C) Counts total conditions",
+            "D) Combines results from two queries",
+            "Question 2: Which is cleaner & faster?",
+            "For finding users from Mumbai, Delhi, or Bangalore?",
+            "A) Using $or with 3 conditions",
+            "B) Using $in: [\"Mumbai\", \"Delhi\", \"Bangalore\"]"
+          ],
+          note: ""
+        },
+        {
+          title: "Quick Quiz – Query Operators (answers)",
+          bullets: [
+            "Question 1: What does $and operator do?",
+            "A) Matches if ANY condition is true",
+            "B) Matches if ALL conditions are true ✓",
+            "C) Counts total conditions",
+            "D) Combines results from two queries",
+            "Question 2: Which is cleaner & faster?",
+            "For finding users from Mumbai, Delhi, or Bangalore?",
+            "A) Using $or with 3 conditions",
+            "B) Using $in: [\"Mumbai\", \"Delhi\", \"Bangalore\"] ✓"
+          ],
+          note: ""
+        },
+        {
+          title: "Quick Quiz - Aggregation Pipeline",
+          bullets: [
+            "Question 1: Best pipeline stage order?",
+            "A) $group → $match → $sort",
+            "B) $match → $group → $sort",
+            "C) $sort → $match → $group",
+            "D) Any order works",
+            "Question 2: Which stage reshapes documents?",
+            "A) $match",
+            "B) $group",
+            "C) $project",
+            "D) $sort"
+          ],
+          note: ""
+        },
+        {
+          title: "Quick Quiz – Aggregation Pipeline (answers)",
+          bullets: [
+            "Question 1: Best pipeline stage order?",
+            "A) $group → $match → $sort",
+            "B) $match → $group → $sort ✓",
+            "C) $sort → $match → $group",
+            "D) Any order works",
+            "Question 2: Which stage reshapes documents?",
+            "A) $match",
+            "B) $group",
+            "C) $project ✓",
+            "D) $sort"
+          ],
+          note: ""
+        },
+        {
+          title: "Final Quiz - Apply Your Knowledge",
+          bullets: [
+            "Scenario:",
+            "E-commerce system: Find all \"active\" orders from Mumbai and Delhi. Calculate total amount per customer. Show only customer name and total. Sort by highest…",
+            "Challenge: Write the aggregation pipeline!"
+          ],
+          note: ""
+        },
+        {
+          title: "Final Quiz – Apply Your Knowledge (answers)",
+          bullets: [
+            "Scenario:",
+            "E-commerce system: Find all \"active\" orders from Mumbai and Delhi. Calculate total amount per customer. Show only customer name and total. Sort by highest…",
+            "Challenge: Write the aggregation pipeline!",
+            "💡 ANSWER",
+            "db.orders.aggregate([",
+            "{ $sort: { total: -1 } }",
+            "])"
+          ],
+          note: ""
+        }
+      ]
+    },
+    {
+      id: "mongo-close",
+      title: "MongoDB wrap-up",
+      slides: [
+        {
+          title: "Thank you!",
+          bullets: [
+            "+91-7395902450",
+            "FERGUSON.COM",
+            "Vishnu.Chaturvedi@ferguson.com"
+          ],
+          note: ""
         }
       ]
     }

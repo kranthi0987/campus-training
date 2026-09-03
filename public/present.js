@@ -177,7 +177,7 @@ function render() {
       ${showNotes && sl.image && sl.bullets.length ? html`<div class="notes" style="margin-top: 16px;"><strong style="color: var(--on-ink);">Points:</strong> ${sl.bullets.join(' · ')}</div>` : ''}
       ${showNotes && sl.note ? html`<div class="notes" style="margin-top: ${sl.image ? 8 : 24}px;"><strong style="color: var(--on-ink);">Say:</strong> ${sl.note}</div>` : ''}
       <div class="bar">
-        <div class="row" style="gap: 8px;"><button class="btn sm" data-adv="-1" ${i === 0 && step === 0 ? 'disabled' : ''}>← Back</button>${step >= steps && s.pendingBlock ? html`<button class="btn sm primary" data-adv="1">Quiz: ${s.pendingBlock} question${s.pendingBlock === 1 ? '' : 's'} →</button>` : i >= total - 1 && step >= steps ? (s.askedCount < s.questionCount ? html`<a class="btn sm primary" href="/host/${s.id}">Content done · go to quiz →</a>` : html`<button class="btn sm primary" data-post="end">Finish session · show scoreboard →</button>`) : html`<button class="btn sm primary" data-adv="1">${step < steps ? 'Next point →' : 'Next slide →'}</button>`}<button class="btn sm ghost" data-jump="stop">Stop</button></div>
+        <div class="row" style="gap: 8px;"><button class="btn sm" data-adv="-1" ${i === 0 && step === 0 ? 'disabled' : ''}>← Back</button>${step >= steps && s.pendingBlock ? html`<button class="btn sm primary" data-adv="1">Quiz: ${s.pendingBlock} question${s.pendingBlock === 1 ? '' : 's'} →</button>` : i >= total - 1 && step >= steps ? (s.askedCount < s.questionCount ? html`<a class="btn sm primary" href="/host/${s.id}">Content done · go to quiz →</a>` : html`<button class="btn sm primary" data-post="end">Finish session · show scoreboard →</button>`) : html`<button class="btn sm primary" data-adv="1">${step < steps ? 'Next point →' : 'Next slide →'}</button>`}<button class="btn sm ghost" data-jump="stop">Stop</button><button class="btn sm ghost" data-fs="1" title="Full screen (F)">⛶ Full screen</button></div>
         <div class="small muted">${i + 1} / ${total}${steps ? html` · point ${step} / ${steps}` : ''}${sl.askAfter ? html` · quiz after this slide` : ''} · ${s.askedCount ? `${s.askedCount} of ${s.questionCount} asked · ` : ''}${s.participantCount} following · <button class="btn sm ghost" id="notesBtn">${showNotes ? 'Hide' : 'Show'} notes</button></div>
       </div>
     </div>`;
@@ -189,6 +189,7 @@ function render() {
   $$('[data-join]').forEach((b) => b.addEventListener('click', () => { showJoin = !showJoin; render(); }));
   $('#fsBtn')?.addEventListener('click', toggleFullscreen);
   $('#fsBtn2')?.addEventListener('click', toggleFullscreen);
+  $$('[data-fs]').forEach((b) => b.addEventListener('click', toggleFullscreen));
   $$('[data-jump]').forEach((b) => b.addEventListener('click', () => jump(b.dataset.jump === 'stop' ? null : Number(b.dataset.jump))));
   $$('[data-adv]').forEach((b) => b.addEventListener('click', () => advance(Number(b.dataset.adv))));
   $$('[data-post]').forEach((b) => b.addEventListener('click', () => {

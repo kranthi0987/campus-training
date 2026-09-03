@@ -13,6 +13,7 @@ export default [
     module: 'Backend', title: 'Spring Boot',
     subtopics: 'Dependency Injection, Controllers, Services, API Gateway, Resilience',
     trainers: ['Syed Suhail', 'Saurav Sanyal'],
+    trainerEmails: ['syed.suhail@ferguson.com', 'saurav.sanyal@ferguson.com', 'mahesh.j@ferguson.com'],
     slidesKey: 'day11-spring-boot',
   },
   {
@@ -20,6 +21,7 @@ export default [
     module: 'Database', title: 'SQL (Azure SQL) & MongoDB',
     subtopics: 'SQL, Joins, Stored Procedures, NoSQL Concepts, Collections, CRUD',
     trainers: ['Dushanth (SQL)', 'Vishnu C (Mongo DB)'],
+    trainerEmails: ['mahesh.j@ferguson.com', 'dushantha.sb@ferguson.com', 'vishnu.chaturvedi@ferguson.com'],
     slidesKey: 'day12-sql-mongodb',
   },
   {
@@ -27,13 +29,15 @@ export default [
     module: 'Frontend', title: 'HTML, CSS, JavaScript & React',
     subtopics: 'Frontend Fundamentals, Components, State, Props, Hooks, Routing',
     trainers: ['Kaushik C (JS)', 'Prakash (React, HTML, CSS)'],
+    trainerEmails: ['prakash.ubs@ferguson.com', 'kaushik.kaushik@ferguson.com'],
     slidesKey: 'day13-frontend',
   },
   {
     key: 'day14-devops-etl', dayNo: 14, date: '2026-09-10', week: 'Week-3',
     module: 'DevOps & ETL', title: 'DevOps & ETL (Databricks)',
     subtopics: 'Git, Jenkins, Docker, Kubernetes, CI/CD Pipeline, Databricks',
-    trainers: ['Vishnu C (DevOps)', 'Santoshini (ETL)'],
+    trainers: ['Ravi Chabria (DevOps)', 'Santoshini (ETL)'],
+    trainerEmails: ['ravi.chabria@ferguson.com', 'santoshini.panda@ferguson.com'],
     slidesKey: 'day14-devops-etl',
   },
   {
@@ -41,18 +45,21 @@ export default [
     module: 'Cloud', title: 'Cloud Fundamentals',
     subtopics: 'Azure Cloud Overview, Compute, Storage, Networking',
     trainers: ['Ashutosh Singh'],
+    trainerEmails: ['ashutosh.singh@ferguson.com'],
   },
   {
     key: 'day17-domain-erp', dayNo: 17, date: '2026-09-16', week: 'Week-4',
     module: 'Domain / ERP', title: 'Salesforce, Trilogie, SupplyChain',
     subtopics: 'Sales, Service, Commerce, Trilogie, Logility, HighJump, Inventory',
     trainers: ['Vidisha / Tejas (Trilogie)', 'Savitha (Supply Chain)', 'Arpitha (Salesforce)'],
+    trainerEmails: ['arpitha.jh@ferguson.com', 'vidisha.bhat@ferguson.com', 'savita.dodamani@ferguson.com'],
   },
   {
     key: 'day18-integration-ai', dayNo: 18, date: '2026-09-17', week: 'Week-4',
     module: 'Integration / AI', title: 'Enterprise Integration / AI Assistance',
     subtopics: 'REST, SOAP, APIGEE, Kafka, OAuth/JWT, GitHub Copilot, Gemini, Prompt Engineering',
     trainers: ['Kranthi Kumar (Integration)', 'Tharun Kumar (AI)'],
+    trainerEmails: ['kranthi.kumar@ferguson.com', 'tharunkumar.kumart@ferguson.com'],
     slidesKey: 'day18-integration-ai',
   },
 ];

@@ -173,7 +173,9 @@ server/seed/       schedule.js sessions; questions/<key>.js banks; slides/<key>.
 public/            Pages: index (join), play, trainer, host, present + shared app.js / styles.css
 tests/             node --test suites: engine, paste parser, HTTP end-to-end
 scripts/           validate-questions.mjs checks every bank (count, mix, answer spread);
-                   export-slides.ps1 / extract-slides.ps1 turn a .pptx into deck pictures + text
+                   export-slides.ps1 / extract-slides.ps1 turn a .pptx into deck pictures + text;
+                   assign-trainers.mjs creates the trainer accounts listed in schedule.js
+                   (trainerEmails) and assigns them to their sessions in an existing database
 design/            The Claude Design canvas the screens are built from
 docs/superpowers/  Design spec
 ```

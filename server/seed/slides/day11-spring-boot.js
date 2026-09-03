@@ -20,7 +20,7 @@ export default {
         {
           title: "Agenda",
           bullets: [
-            "Understanding Web Apps and Backend Engineering.",
+            "Understanding Web Apps and Backend Engineering",
             "Intro To Spring",
             "Core Spring Concepts",
             "Creating a Spring Project",
@@ -116,14 +116,14 @@ export default {
           bullets: [
             "Syed Ameer Suhail",
             "7.5 Years of experience in Backend Development",
-            "Currently working as a Lead Software Engineer - Sales order Domain.",
-            "Joined Ferguson in May 2025.",
-            "Core Expertise: Java, Spring Boot, Microservices, Cloud (Azure) & Backend Systems.",
+            "Currently working as a Lead Software Engineer - Sales order Domain",
+            "Joined Ferguson in May 2025",
+            "Core Expertise: Java, Spring Boot, Microservices, Cloud (Azure) & Backend Systems",
             "Saurav Sanyal",
-            "Software Engineer with 6+ YoE in building backend and enterprise applications.",
-            "Currently working as Lead Software Engineer at Omni#1 team, working on APIs, middleware, integrations, and event-driven systems.",
-            "My core expertise includes Java, Spring Boot, Microservices, Cloud, Databases, and Distributed Systems.",
-            "Currently expanding into AI Engineering, with hands-on work in RAG, LLMs, Vector Search, and AI-powered applications."
+            "Software Engineer with 6+ YoE in building backend and enterprise applications",
+            "Currently working as Lead Software Engineer at Omni#1 team, working on APIs, middleware, integrations, and event-driven systems",
+            "My core expertise includes Java, Spring Boot, Microservices, Cloud, Databases, and Distributed Systems",
+            "Currently expanding into AI Engineering, with hands-on work in RAG, LLMs, Vector Search, and AI-powered applications"
           ],
           note: ""
         }
@@ -152,7 +152,7 @@ export default {
         {
           title: "Web Application",
           bullets: [
-            "A Web application is a interactive software application that you can access through a web browser over the internet.",
+            "A Web application is a interactive software application that you can access through a web browser over the internet",
             "Examples :",
             "Online Banking",
             "E-commerce Application",
@@ -184,7 +184,7 @@ export default {
         {
           title: "What Does a Backend Engineer Do?",
           bullets: [
-            "A backend engineer builds and maintains the server-side part of an application.",
+            "A backend engineer builds and maintains the server-side part of an application",
             "Core responsibilities",
             "Build REST APIs",
             "Implement business logic",
@@ -222,7 +222,7 @@ export default {
         {
           title: "Spring Framework",
           bullets: [
-            "The Spring Framework is a popular open-source Java framework used to build enterprise applications, especially backend and web applications.",
+            "The Spring Framework is a popular open-source Java framework used to build enterprise applications, especially backend and web applications",
             "What does Spring provide",
             "Spring Core — Dependency Injection and IoC (Inversion of Control)",
             "Spring MVC — Web applications and REST APIs",
@@ -236,14 +236,14 @@ export default {
         {
           title: "What is Spring Boot?",
           bullets: [
-            "Spring Boot is a tool built on top of Spring that makes using Spring much easier.",
+            "Spring Boot is a tool built on top of Spring that makes using Spring much easier",
             "Java",
             "↓",
             "Spring",
             "Spring Boot",
-            "Java is the programming language.",
-            "Spring is a framework that provides lots of infrastructure for Java applications.",
-            "Spring Boot makes setting up and using Spring applications much easier."
+            "Java is the programming language",
+            "Spring is a framework that provides lots of infrastructure for Java applications",
+            "Spring Boot makes setting up and using Spring applications much easier"
           ],
           note: ""
         }
@@ -338,9 +338,9 @@ export default {
             "A POM (Project Object Model) file is an XML file that serves as the fundamental building block of a Maven project. It contains information about the project…",
             "Importance of the POM File",
             "The POM file is pivotal in Maven-based projects for various reasons:",
-            "Dependency Management: It defines project dependencies and their versions, ensuring that the required libraries are available during compilation and runtime.",
+            "Dependency Management: It defines project dependencies and their versions, ensuring that the required libraries are available during compilation and runtime",
             "Lifecycle Management: It defines the build lifecycle phases and their associated goals, allowing developers to execute tasks such as compilation, testing,…",
-            "Plugin Configuration: It specifies which plugins should be used in the build process and how they should be configured.",
+            "Plugin Configuration: It specifies which plugins should be used in the build process and how they should be configured",
             "Project Metadata",
             "Parent POM",
             "Dependencies",
