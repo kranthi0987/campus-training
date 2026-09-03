@@ -343,10 +343,14 @@ async function newSession() {
 
 // ---------------------------------------------------------------- builder
 async function openSession(id) {
-  try {
-    current = await api(`/api/sessions/${id}`);
-    current.deck = current.session.hasSlides ? (await api(`/api/sessions/${id}/deck`)).deck : null;
-  } catch (err) { toast(err.message, { error: true }); location.hash = '#/sessions'; return; }
+  try { current = await api(`/api/sessions/${id}`); }
+  catch (err) { toast(err.message, { error: true }); location.hash = '#/sessions'; return; }
+  // The deck only feeds the checkpoint card; without it the questions still open.
+  current.deck = null;
+  if (current.session.hasSlides) {
+    try { current.deck = (await api(`/api/sessions/${id}/deck`)).deck; }
+    catch (err) { toast(`Slides could not be loaded: ${err.message}`, { error: true }); }
+  }
   cpDraft = null;
   editing = current.questions[0] || null;
   draft = editing ? fromQuestion(editing) : blankDraft();
@@ -556,9 +560,9 @@ function renderBuilder() {
  * one 4–6, and so on) so the trainer sees numbers they can edit.
  */
 function checkpointPicks(s, slides, qs) {
-  if (s.checkpoints) {
+  if (s.checkpoints && typeof s.checkpoints === 'object') {
     const ids = new Set(qs.map((q) => q.id));
-    return Object.fromEntries(Object.entries(s.checkpoints).map(([k, v]) => [k, (v || []).filter((id) => ids.has(id))]).filter(([, v]) => v.length));
+    return Object.fromEntries(Object.entries(s.checkpoints).map(([k, v]) => [k, (Array.isArray(v) ? v : []).filter((id) => ids.has(id))]).filter(([, v]) => v.length));
   }
   const out = {};
   let c = 0;

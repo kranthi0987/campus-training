@@ -125,6 +125,22 @@ function migrate(db) {
   if (!qcols.includes('code')) db.exec('ALTER TABLE questions ADD COLUMN code TEXT');
 }
 
+/**
+ * Quiz checkpoints as stored: {"<slide index>": [question ids]}. An earlier release stored
+ * counts ({"3": 2}); those entries are dropped so clients only ever see lists.
+ */
+export function parseCheckpoints(raw) {
+  if (!raw) return null;
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch { return null; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const out = {};
+  for (const [k, v] of Object.entries(parsed)) {
+    if (Array.isArray(v) && v.length) out[k] = v.map(Number).filter(Number.isInteger);
+  }
+  return out;
+}
+
 /** Row helpers that keep JSON columns tidy. */
 export function rowToSession(r) {
   if (!r) return null;
@@ -137,7 +153,7 @@ export function rowToSession(r) {
     questionClosed: !!r.question_closed, startedAt: r.started_at, endsAt: r.ends_at, endedAt: r.ended_at,
     slideIndex: r.slide_index, slideStep: r.slide_step ?? 0, reveal: r.reveal || 'end',
     blockEnd: r.block_end ?? null,
-    checkpoints: r.checkpoints ? JSON.parse(r.checkpoints) : null,
+    checkpoints: parseCheckpoints(r.checkpoints),
   };
 }
 

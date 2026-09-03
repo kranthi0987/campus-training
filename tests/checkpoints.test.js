@@ -178,3 +178,16 @@ test("a custom checkpoint map overrides the Python deck's authored ones wholesal
   assert.deepEqual(deck.slides.map((sl, i) => [i, sl.askAfter || 0]).filter(([, n]) => n), [[12, 15]], 'authored slides 7-11 no longer ask');
   await call(`/api/sessions/${s.id}`, { method: 'PUT', body: { checkpoints: null } });
 });
+
+test('checkpoints saved by the earlier count-based release are ignored, not served', async () => {
+  const s = (await call('/api/sessions')).data.sessions.find((x) => x.key === 'day11-spring-boot');
+  app.db.prepare('UPDATE sessions SET checkpoints = ? WHERE id = ?').run(JSON.stringify({ 3: 2, 7: 'x', 9: [] }), s.id);
+  const got = (await call(`/api/sessions/${s.id}`)).data.session;
+  assert.deepEqual(got.checkpoints, {}, 'nothing usable in the old map');
+  const { deck } = (await call(`/api/sessions/${s.id}/deck`)).data;
+  assert.equal(deck.slides.filter((sl) => sl.askAfter).length, 0);
+  const list = (await call(`/api/sessions/${s.id}`)).data.questions;
+  app.db.prepare('UPDATE sessions SET checkpoints = ? WHERE id = ?').run(JSON.stringify({ 3: 2, 5: [list[0].id, 'junk'] }), s.id);
+  assert.deepEqual((await call(`/api/sessions/${s.id}`)).data.session.checkpoints, { 5: [list[0].id] }, 'mixed maps keep only the id lists');
+  await call(`/api/sessions/${s.id}`, { method: 'PUT', body: { checkpoints: null } });
+});
