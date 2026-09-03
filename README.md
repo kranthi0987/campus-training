@@ -17,7 +17,7 @@ The console prints the address to share, for example:
 
 ```
   Interns join at:   http://192.168.0.184:3000
-  Trainer sign-in:   http://192.168.0.184:3000/trainer   (first sign-in with the default password "Ferguson@2026" creates the admin)
+  Trainer sign-in:   http://192.168.0.184:3000/trainer
 ```
 
 Everyone must be on the same Wi‑Fi. If phones cannot open the page, allow Node through
@@ -127,8 +127,7 @@ no manual configuration.
 2. In the Render dashboard choose **New → Blueprint**, pick the repo and click **Apply**.
    Render creates the web service `ferguson-training-quiz` on the free plan.
 3. Open the service URL (`https://ferguson-training-quiz.onrender.com` or similar).
-   Go to `/trainer`, sign in with any email and the default password: the first account
-   becomes the admin. Interns join from the same URL; the QR code and join link on the
+   Go to `/trainer` and sign in with one of the accounts in the committed database. Interns join from the same URL; the QR code and join link on the
    host and present screens already point at it (`RENDER_EXTERNAL_URL` is picked up
    automatically, or set `PUBLIC_URL` for a custom domain).
 

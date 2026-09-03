@@ -3,7 +3,7 @@ import http from 'node:http';
 import os from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { openDb } from './db.js';
-import { Auth, DEFAULT_PASSWORD } from './auth.js';
+import { Auth } from './auth.js';
 import { Live, LiveError } from './live.js';
 import { seedIfEmpty, loadSlideDecks } from './seed/index.js';
 import { createApi } from './api.js';
@@ -78,7 +78,7 @@ if (isMain) {
   app.server.listen(port, host, () => {
     console.log('');
     console.log(`  Interns join at:   ${publicUrl}`);
-    console.log(`  Trainer sign-in:   ${publicUrl}/trainer   (any email + default password "${DEFAULT_PASSWORD}")`);
+    console.log(`  Trainer sign-in:   ${publicUrl}/trainer`);
     console.log(`  On this laptop:    http://localhost:${port}`);
     console.log('');
     console.log('  Both devices must be on the same Wi-Fi. If phones cannot connect, allow Node through Windows Firewall.');
