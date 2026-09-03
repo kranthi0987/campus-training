@@ -84,6 +84,8 @@ export function createApi({ db, live, auth, decks, publicUrl }) {
     const t = requireTrainer(req);
     const body = await readBody(req);
     if (!auth.changePassword(t.email, body.current, body.next)) throw new HttpError(400, 'Current password is wrong or the new one is shorter than 8 characters');
+    // A new password invalidates every existing token; keep this browser signed in with a fresh one.
+    res.setHeader('Set-Cookie', `${COOKIE}=${auth.issueToken(t.email)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}`);
     sendJson(res, 200, { ok: true });
   });
 

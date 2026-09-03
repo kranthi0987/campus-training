@@ -14,6 +14,10 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Signs trainer sign-in cookies. Keeping it stable means trainers stay signed in across
+      # deploys and restarts; without it a fresh secret is generated on every start.
+      - key: SESSION_SECRET
+        generateValue: true
       # PUBLIC_URL is taken from RENDER_EXTERNAL_URL automatically; set it here only
       # if you put a custom domain in front of the service.
       # - key: PUBLIC_URL

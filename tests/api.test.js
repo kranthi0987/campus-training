@@ -38,7 +38,11 @@ test('trainer login: the first sign-in with the default password creates the adm
   assert.equal(ok.data.trainer.role, 'admin', 'the first account is the admin');
   assert.equal((await call('/api/trainer/login', { method: 'POST', body: { email: 'someone@example.com', password: 'Ferguson@2026' } })).status, 401, 'no open sign-up once an account exists');
   assert.equal((await call('/api/trainer/password', { method: 'POST', body: { current: 'Ferguson@2026', next: 'short' } })).status, 400);
-  assert.equal((await call('/api/trainer/password', { method: 'POST', body: { current: 'Ferguson@2026', next: 'MyOwnPass!9' } })).status, 200);
+  const changed = await call('/api/trainer/password', { method: 'POST', body: { current: 'Ferguson@2026', next: 'MyOwnPass!9' } });
+  assert.equal(changed.status, 200);
+  assert.equal((await call('/api/trainer/me')).status, 401, 'the old cookie dies with the old password');
+  cookie = changed.res.headers.get('set-cookie').split(';')[0];
+  assert.equal((await call('/api/trainer/me')).status, 200, 'the response carries a fresh cookie so this browser stays signed in');
   assert.equal((await call('/api/trainer/login', { method: 'POST', body: { email: 'kranthi@example.com', password: 'Ferguson@2026' } })).status, 401, 'default no longer works once changed');
   assert.equal((await call('/api/trainer/login', { method: 'POST', body: { email: 'kranthi@example.com', password: 'MyOwnPass!9' } })).status, 200);
 });

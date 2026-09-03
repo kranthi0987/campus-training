@@ -1,6 +1,18 @@
-import { $, $$, api, html, raw, pill, toast, fmtDate } from '/app.js';
+import { $, $$, api as request, html, raw, pill, toast, fmtDate } from '/app.js';
 
 const app = $('#app');
+
+/** Every call goes through here so an expired sign-in shows the login form instead of a cryptic toast. */
+async function api(path, opts) {
+  try { return await request(path, opts); }
+  catch (err) {
+    if (err.status === 401 && trainer && !String(path).startsWith('/api/trainer/')) {
+      trainer = null;
+      renderLogin('Your sign-in has expired (the server was restarted). Please sign in again.');
+    }
+    throw err;
+  }
+}
 let trainer = null;
 let sessions = [];
 let current = null;      // { session, questions, deck }
@@ -54,7 +66,7 @@ function accountPicker(list, selected) {
 }
 
 // ---------------------------------------------------------------- login
-async function renderLogin() {
+async function renderLogin(notice = '') {
   let setupNeeded = false;
   try { ({ setupNeeded } = await api('/api/info')); } catch { /* optional */ }
   app.innerHTML = html`
@@ -74,6 +86,7 @@ async function renderLogin() {
       <section class="form">
         <form class="card stack" id="loginForm" style="gap: 24px;">
           <div class="stack" style="gap: 4px;"><h1 style="font-size: 26px;">Trainer sign‑in</h1><p class="muted small">Use your work email.</p></div>
+          ${notice ? html`<div class="wash row" style="gap: 10px; align-items: flex-start; border-left: 3px solid var(--hard);">${raw(icon('info'))}<span>${notice}</span></div>` : ''}
           <div class="stack" style="gap: 16px;">
             <div class="field"><label for="email">Email</label><input class="input" id="email" type="email" required autocomplete="username" placeholder="you@company.com"></div>
             <div class="field"><label for="password">Password</label><input class="input" id="password" type="password" required autocomplete="current-password"></div>
@@ -90,7 +103,8 @@ async function renderLogin() {
       const out = await api('/api/trainer/login', { method: 'POST', body: { email: $('#email').value, password: $('#password').value, name: $('#tname')?.value || '' } });
       trainer = out.trainer;
       if (out.usingDefault) toast('Signed in with the default password. Change it from the top bar when you can.', { ms: 5000 });
-      location.hash = '#/sessions';
+      // Back to where they were (e.g. a session's questions) after a sign-in that expired mid-way.
+      if (!location.hash || location.hash === '#/') location.hash = '#/sessions';
       route();
     } catch (err) { toast(err.message, { error: true }); }
   });

@@ -1,6 +1,9 @@
 // Entry point: serves the pages and the API on the LAN.
 import http from 'node:http';
 import os from 'node:os';
+import path from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { openDb } from './db.js';
 import { Auth } from './auth.js';
@@ -30,11 +33,29 @@ export function lanAddress() {
   }
 }
 
-export async function createApp({ dbPath, publicUrl } = {}) {
+/**
+ * The secret that signs trainer sign-in cookies: SESSION_SECRET when set (Render generates one
+ * in render.yaml), otherwise a random value kept in a file beside the database so restarts on
+ * the trainer's laptop do not sign everyone out. In-memory databases (tests) get a throwaway one.
+ */
+export function sessionSecret(dbPath = process.env.DB_PATH || 'data/daily-quiz.sqlite') {
+  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
+  if (!dbPath || dbPath === ':memory:') return null;
+  const file = path.join(path.dirname(path.resolve(dbPath)), '.session-secret');
+  try {
+    if (existsSync(file)) return readFileSync(file, 'utf8').trim() || null;
+    mkdirSync(path.dirname(file), { recursive: true });
+    const secret = randomBytes(32).toString('hex');
+    writeFileSync(file, secret, { mode: 0o600 });
+    return secret;
+  } catch { return null; }
+}
+
+export async function createApp({ dbPath, publicUrl, secret } = {}) {
   const db = openDb(dbPath);
   const seeded = await seedIfEmpty(db, { log: (m) => console.log('  ' + m) });
   const decks = await loadSlideDecks();
-  const auth = new Auth(db);
+  const auth = new Auth(db, { secret: secret || sessionSecret(dbPath) });
   const live = new Live(db, { decks });
   const api = createApi({ db, live, auth, decks, publicUrl: publicUrl || '' });
   const serveStatic = createStatic();

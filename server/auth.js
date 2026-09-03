@@ -4,8 +4,12 @@
 // trainer accounts, certificates); 'trainer' only sees the sessions assigned to them.
 // The very first account is created by signing in with the default password and becomes
 // the admin; every later account is created by an admin.
-import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto';
+import { scryptSync, randomBytes, timingSafeEqual, createHmac, createHash } from 'node:crypto';
 import { HttpError } from './http.js';
+
+const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // matches the cookie's Max-Age
+/** Short, non-reversible mark of a password hash: changing the password invalidates old tokens. */
+const fingerprint = (passwordHash) => createHash('sha256').update(String(passwordHash)).digest('base64url').slice(0, 16);
 
 export const DEFAULT_PASSWORD = process.env.DEFAULT_TRAINER_PASSWORD || 'Ferguson@2026';
 export const COOKIE = 'dq_trainer';
@@ -36,8 +40,10 @@ export function isEmail(email) {
 const toUser = (r) => (r ? { email: r.email, name: r.name, role: r.role || 'trainer', createdAt: r.created_at } : null);
 
 export class Auth {
-  constructor(db) {
+  /** `secret` signs sign-in tokens; pass a stable one (SESSION_SECRET) so trainers stay signed in across restarts. */
+  constructor(db, { secret } = {}) {
     this.db = db;
+    this.secret = secret || randomBytes(32).toString('hex');
   }
 
   count() {
@@ -123,14 +129,40 @@ export class Auth {
     return true;
   }
 
+  /**
+   * Sign-in tokens are signed, not stored: <payload>.<hmac>, where the payload carries the
+   * email, the issue time and a fingerprint of the password hash. They stay valid across server
+   * restarts and redeploys (the database is wiped on every deploy on the free hosting tier) as
+   * long as the secret is the same, and die when the password changes or the account is removed.
+   */
   issueToken(email) {
-    const token = randomBytes(24).toString('hex');
-    this.db.prepare('INSERT INTO trainer_tokens (token, email, created_at) VALUES (?, ?, ?)').run(token, email, Date.now());
-    return token;
+    const row = this.db.prepare('SELECT password_hash FROM trainers WHERE email = ?').get(email);
+    if (!row) return null;
+    const payload = Buffer.from(JSON.stringify({ e: email, t: Date.now(), p: fingerprint(row.password_hash) })).toString('base64url');
+    return `${payload}.${this.sign(payload)}`;
+  }
+
+  sign(payload) {
+    return createHmac('sha256', this.secret).update(payload).digest('base64url');
   }
 
   trainerForToken(token) {
     if (!token) return null;
+    const dot = String(token).indexOf('.');
+    if (dot < 0) return this.legacyTrainerForToken(token);
+    const payload = token.slice(0, dot), sig = token.slice(dot + 1);
+    const expected = this.sign(payload);
+    if (sig.length !== expected.length || !timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+    let data;
+    try { data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')); } catch { return null; }
+    if (!data || typeof data.e !== 'string' || !(Date.now() - Number(data.t) < TOKEN_TTL_MS)) return null;
+    const row = this.db.prepare('SELECT email, name, role, password_hash FROM trainers WHERE email = ?').get(data.e);
+    if (!row || fingerprint(row.password_hash) !== data.p) return null;
+    return { email: row.email, name: row.name, role: row.role || 'trainer' };
+  }
+
+  /** Cookies issued before signed tokens: rows in trainer_tokens, valid until the next deploy. */
+  legacyTrainerForToken(token) {
     const row = this.db.prepare(
       'SELECT t.email, t.name, t.role FROM trainer_tokens k JOIN trainers t ON t.email = k.email WHERE k.token = ?',
     ).get(token);
@@ -138,6 +170,7 @@ export class Auth {
   }
 
   revoke(token) {
-    this.db.prepare('DELETE FROM trainer_tokens WHERE token = ?').run(token);
+    // Signed tokens cannot be recalled individually; clearing the cookie signs the browser out.
+    if (token && !String(token).includes('.')) this.db.prepare('DELETE FROM trainer_tokens WHERE token = ?').run(token);
   }
 }

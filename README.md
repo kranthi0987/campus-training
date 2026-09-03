@@ -29,7 +29,9 @@ netsh advfirewall firewall add rule name="Daily Quiz" dir=in action=allow protoc
 
 Optional environment variables: `PORT` (default 3000), `PUBLIC_URL` (the address encoded in
 the QR code, if auto-detection picks the wrong network adapter), `DB_PATH` (default
-`data/daily-quiz.sqlite`), `DEFAULT_TRAINER_PASSWORD` (default `Ferguson@2026`).
+`data/daily-quiz.sqlite`), `DEFAULT_TRAINER_PASSWORD` (default `Ferguson@2026`), `SESSION_SECRET`
+(signs trainer sign-in cookies; when unset a random one is kept in `data/.session-secret`, so
+sign-ins survive restarts either way).
 
 ## Running a session
 
@@ -153,6 +155,10 @@ Free-tier limits to plan around:
   and check scorecards before the session ends. For durable data upgrade the service
   to a paid instance, attach a disk and set `DB_PATH` (see the comments in
   `render.yaml`).
+- **Sign-ins survive deploys.** `render.yaml` generates a `SESSION_SECRET` for the service; if
+  the service was created before that line existed, add the variable once in the Render
+  dashboard (any long random string). Without it every deploy signs all trainers out, and the
+  next click shows "Sign in as a trainer" until they sign in again.
 - **Spin-down after 15 minutes idle.** The first request afterwards takes up to a
   minute. Open the host page a few minutes before the session starts.
 - **750 free instance hours per workspace per month**, shared by all free services.
