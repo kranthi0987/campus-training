@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Join · Ferguson Training</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="phone" id="app">
+    <div class="stack" style="gap: 4px;">
+      <img class="logo" src="/brand/logo.svg" alt="Ferguson" style="height: 26px; margin-bottom: 16px;">
+      <div class="eyebrow">Ferguson Training</div>
+      <h1 style="margin-top: 8px;">Join today's session</h1>
+      <p class="muted small" id="sessionLine">Enter the code on the screen, or scan the QR code.</p>
+    </div>
+
+    <form id="joinForm" class="stack" style="gap: 18px; margin-top: 32px;" autocomplete="on">
+      <div class="field">
+        <label for="code">Session code</label>
+        <input class="input code" id="code" name="code" inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ABC123" maxlength="8" required>
+        <div class="tiny faint" id="codeHint"></div>
+      </div>
+      <div class="field">
+        <label for="email">Your Ferguson email</label>
+        <input class="input" id="email" name="email" type="email" autocomplete="email" placeholder="firstname.lastname@ferguson.com" required>
+        <div class="tiny faint" id="emailHint">Your name comes from the participant list.</div>
+      </div>
+      <button class="btn primary lg block" id="joinBtn" type="submit" style="margin-top: 10px;">Join session</button>
+    </form>
+
+    <div id="resume" class="card row" style="margin-top: 16px; gap: 12px;" hidden>
+      <div class="grow small"><strong id="resumeName"></strong><div class="muted tiny">You already joined a session on this device.</div></div>
+      <a class="btn sm" href="/play">Continue</a>
+    </div>
+
+    <div class="card row" style="margin-top: auto; gap: 12px;">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#00446a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M3 16h14M6 16V9M10 16V4M14 16v-5"></path></svg>
+      <div class="small muted"><strong style="color: var(--text);">100 points</strong> for every correct answer, 0 for a wrong one. Each question has its own timer.</div>
+    </div>
+    <p class="tiny faint center" style="margin-top: 16px;"><a href="/trainer">Trainer sign-in</a></p>
+  </main>
+  <script type="module" src="/join.js"></script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Present · Ferguson Training</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { overflow: hidden; }
+    .deck { height: 100vh; display: grid; grid-template-columns: 260px minmax(0, 1fr); }
+    .nav { border-right: 1px solid var(--ink-line); padding: 24px 16px; overflow: auto; display: flex; flex-direction: column; gap: 18px; }
+    .sec { display: flex; flex-direction: column; gap: 2px; }
+    .sec .name { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--on-ink-faint); padding: 0 10px 4px; }
+    .sec button { text-align: left; border: 0; background: transparent; color: var(--on-ink-muted); padding: 7px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+    .sec button:hover { background: rgba(255,255,255,0.05); }
+    .sec button.on { background: var(--amber); color: var(--ink); font-weight: 700; }
+    .slide { display: flex; flex-direction: column; padding: 56px 72px 40px; min-height: 0; }
+    .slide .eyebrow { color: var(--amber); font-size: 13px; }
+    .slide h1 { font-size: 54px; margin-top: 12px; }
+    .slide .body { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 48px; margin-top: 36px; flex: 1; min-height: 0; align-items: start; }
+    .slide .agenda { margin-top: 32px; }
+    .slide.has-picture { padding: 24px 40px 24px; }
+    .slide .picture { flex: 1; min-height: 0; margin-top: 12px; display: flex; align-items: center; justify-content: center; }
+    .slide .picture img { max-width: 100%; max-height: 100%; width: auto; height: auto; border-radius: 6px; box-shadow: 0 24px 60px -30px rgba(0,0,0,0.7); background: #fff; }
+    .slide.has-picture .notes { font-size: 14px; padding: 10px 14px; }
+    .slide .agenda .t { font-size: 22px; } .slide .agenda .s { font-size: 14px; }
+    .slide .body.single { grid-template-columns: 1fr; }
+    .bullets { margin: 0; padding-left: 26px; display: flex; flex-direction: column; gap: 16px; font-size: 26px; line-height: 1.35; }
+    .bullets li::marker { color: var(--amber); }
+    pre.code { font-size: 18px; max-height: 100%; }
+    .bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 24px; border-top: 1px solid var(--ink-line); }
+    .notes { background: var(--ink-2); border: 1px solid var(--ink-line); border-radius: 10px; padding: 14px 16px; font-size: 15px; color: #c9cfdc; line-height: 1.5; }
+    .idle { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 20px; padding: 48px 56px; overflow: auto; }
+    .idle h1 { font-size: 48px; }
+    kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--ink-line); border-radius: 4px; padding: 1px 5px; color: var(--on-ink-muted); }
+    body.fullscreen .deck { grid-template-columns: 1fr; }
+    body.fullscreen .nav { display: none; }
+    .idle-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 40px; align-items: start; width: 100%; }
+    .joincard { display: flex; gap: 18px; align-items: center; padding: 16px; background: var(--ink-2); border: 1px solid var(--ink-line); border-radius: 14px; }
+    .joincard img { width: 120px; height: 120px; border-radius: 10px; background: #fff; padding: 6px; flex-shrink: 0; }
+    .joincard.big { flex-direction: column; align-items: stretch; padding: 22px; }
+    .joincard.big img { width: 100%; height: auto; max-width: 340px; align-self: center; padding: 12px; }
+    .joincard .jcode { font-family: var(--display); font-weight: 800; font-size: 40px; letter-spacing: 0.14em; line-height: 1; color: var(--amber); }
+    .joinbadge { border: 1px solid var(--ink-line); background: var(--ink-2); color: var(--on-ink-muted); border-radius: 999px; padding: 6px 14px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+    .joinbadge strong { color: var(--amber); letter-spacing: 0.1em; }
+    .joinbadge:hover { border-color: var(--amber); }
+    .joinoverlay { position: fixed; inset: 0; background: rgba(0, 27, 45, 0.82); display: flex; align-items: center; justify-content: center; z-index: 30; cursor: pointer; }
+    .joinoverlay-inner { width: min(560px, 90vw); }
+    .joinoverlay .joincard.big img { max-width: 420px; }
+    .joinoverlay .jcode { font-size: 64px; }
+    @media (max-width: 1000px) { .idle-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 1000px) { .deck { grid-template-columns: 1fr; } .nav { display: none; } .slide { padding: 32px; } .slide h1 { font-size: 34px; } .bullets { font-size: 20px; } .slide .body { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body class="ink">
+  <div id="app"><p class="muted" style="padding: 40px;">Loading deck…</p></div>
+  <script type="module" src="/present.js"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ferguson Training</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .phone { padding-top: 40px; }
+    .question { font-family: var(--display); font-weight: 700; font-size: 24px; line-height: 1.22; letter-spacing: -0.01em; text-wrap: pretty; margin-top: 28px; }
+    .result-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; font-weight: 700; font-size: 13px; }
+    .result-badge.correct { background: var(--easy-ink); color: var(--ink); }
+    .result-badge.wrong { background: var(--hard-ink); color: var(--ink); }
+    .bullets { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; font-size: 16px; line-height: 1.4; }
+    .footer { margin-top: auto; padding-top: 24px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--on-ink-muted); }
+    .bigscore { font-family: var(--display); font-weight: 800; font-size: 64px; line-height: 1; letter-spacing: -0.03em; }
+    textarea.input { min-height: 72px; }
+  </style>
+</head>
+<body class="ink">
+  <main class="phone" id="app">
+    <p class="muted">Connecting…</p>
+  </main>
+  <script type="module" src="/play.js"></script>
+</body>
+</html>

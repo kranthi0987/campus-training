@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Certificate · Campus Training</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { background: #e9e6df; }
+    .cwrap { max-width: 1180px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+    .cert { position: relative; width: 100%; aspect-ratio: 1123 / 794; background: var(--card); border: 3px solid var(--brand); outline: 1px solid var(--line); outline-offset: -12px; box-shadow: 0 30px 60px -40px rgba(15,22,38,0.5); padding: 5.5% 6%; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; text-align: center; overflow: hidden; }
+    .cert .stripes { position: absolute; top: 22px; left: 5.5%; right: 5.5%; height: 12px; background: repeating-linear-gradient(90deg, var(--brand) 0 22px, transparent 22px 44px, var(--brand-ink) 44px 66px, transparent 66px 88px); }
+    .cert .programme { margin-top: 26px; font-family: var(--display); font-weight: 800; font-size: clamp(18px, 2.3vw, 26px); letter-spacing: -0.01em; }
+    .cert .kicker { margin-top: 6%; font-size: 14px; font-weight: 700; letter-spacing: 0.35em; color: var(--brand); }
+    .cert .name { font-family: var(--display); font-weight: 800; font-size: clamp(28px, 6.2vw, 72px); letter-spacing: -0.02em; line-height: 1.05; margin-top: 12px; overflow-wrap: anywhere; }
+    .cert .rule { width: 40%; height: 3px; background: var(--brand-ink); margin: 14px 0 18px; }
+    .cert .title { font-family: var(--display); font-weight: 700; font-size: clamp(18px, 2.6vw, 30px); margin-top: 10px; }
+    .cert .stats { display: flex; gap: 0; background: var(--paper); border-radius: 12px; margin-top: 22px; }
+    .cert .stats div { padding: 12px 34px; text-align: center; }
+    .cert .stats strong { display: block; font-family: var(--display); font-size: 24px; font-weight: 800; }
+    .cert .stats span { font-size: 11px; letter-spacing: 0.12em; color: var(--muted); }
+    .cert .sigs { margin-top: auto; display: flex; gap: 40px; width: 100%; justify-content: center; }
+    .cert .sig { width: 240px; border-top: 1px solid var(--text); padding-top: 8px; }
+    .cert .sig strong { display: block; font-size: 14px; }
+    .cert .sig span { font-size: 11px; letter-spacing: 0.12em; color: var(--muted); }
+    .cert .foot { font-size: 11px; color: var(--faint); margin-top: 16px; overflow-wrap: anywhere; }
+
+    /* Phones and small tablets: the certificate flows vertically instead of keeping the A4 shape. */
+    @media (max-width: 720px) {
+      .cwrap { padding: 12px; gap: 12px; }
+      .actions { flex-direction: column; align-items: stretch; }
+      .actions .row { flex-direction: column; align-items: stretch; }
+      .actions .btn { width: 100%; }
+      .cert { aspect-ratio: auto; padding: 36px 18px 24px; outline-offset: -8px; border-width: 2px; }
+      .cert .stripes { top: 14px; left: 18px; right: 18px; height: 8px; background: repeating-linear-gradient(90deg, var(--brand) 0 14px, transparent 14px 28px, var(--brand-ink) 28px 42px, transparent 42px 56px); }
+      .cert .programme { margin-top: 4px; font-size: 18px; }
+      .cert .kicker { margin-top: 22px; font-size: 11px; letter-spacing: 0.28em; }
+      .cert .name { font-size: clamp(26px, 9vw, 40px); }
+      .cert .rule { width: 60%; }
+      .cert .title { font-size: 20px; }
+      .cert .stats { flex-direction: column; width: 100%; margin-top: 18px; }
+      .cert .stats div { padding: 10px 12px; border-top: 1px solid var(--line-soft); }
+      .cert .stats div:first-child { border-top: 0; }
+      .cert .sigs { flex-direction: column; gap: 18px; margin-top: 26px; align-items: center; }
+      .cert .sig { width: 100%; max-width: 260px; }
+    }
+
+    @media print {
+      @page { size: A4 landscape; margin: 0; }
+      body { background: #fff; }
+      .cwrap { padding: 0; max-width: none; }
+      .actions, .note { display: none !important; }
+      .cert { width: 297mm; height: 210mm; aspect-ratio: auto; box-shadow: none; outline: none; border-width: 2mm; padding: 5.5% 6%; }
+      .cert .stats { flex-direction: row; width: auto; }
+      .cert .sigs { flex-direction: row; gap: 40px; }
+      .cert .sig { width: 240px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="cwrap" id="app"><p class="muted">Loading your certificate…</p></div>
+  <script type="module" src="/certificate.js"></script>
+</body>
+</html>

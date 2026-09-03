@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Host · Ferguson Training</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .stage { min-height: calc(100vh - 72px); padding: 40px 48px; display: grid; gap: 48px; }
+    .lobby { grid-template-columns: 520px minmax(0, 1fr); }
+    .qr { background: var(--card); padding: 18px; border-radius: 16px; width: 336px; height: 336px; }
+    .qr img { width: 100%; height: 100%; display: block; }
+    .code { font-family: var(--display); font-weight: 800; font-size: 64px; letter-spacing: 0.14em; line-height: 1; color: var(--amber); }
+    .roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; align-content: start; }
+    .chip { height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 16px; background: var(--ink-2); border: 1px solid var(--ink-line); border-radius: 10px; font-weight: 600; font-size: 15px; }
+    .chip.new { border-color: var(--amber); }
+    .chip.answered { border-color: var(--easy-ink); }
+    .live { grid-template-columns: minmax(0, 1fr) 360px; }
+    .qtext { font-family: var(--display); font-weight: 700; font-size: 40px; line-height: 1.18; letter-spacing: -0.015em; text-wrap: pretty; }
+    .opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .opts .option { min-height: 84px; font-size: 22px; cursor: default; }
+    .opts .option .key { width: 40px; height: 40px; font-size: 18px; }
+    .tally { margin-left: auto; font-family: var(--display); font-weight: 700; font-size: 18px; color: var(--on-ink-muted); }
+    .bigclock { font-family: var(--display); font-weight: 800; font-size: 40px; letter-spacing: -0.02em; line-height: 1; }
+    .podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: end; }
+    .podium .col { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .podium .block { width: 100%; background: var(--ink-2); border: 1px solid var(--ink-line); border-radius: 12px 12px 0 0; display: flex; justify-content: center; padding-top: 12px; font-family: var(--display); font-weight: 800; font-size: 22px; color: var(--on-ink-muted); }
+    .podium .col.first .block { background: var(--amber); color: var(--ink); border-color: var(--amber); }
+    .ended { grid-template-columns: 560px minmax(0, 1fr); }
+    .kpi { font-family: var(--display); font-weight: 700; font-size: 18px; color: var(--on-ink); }
+    @media (max-width: 1100px) { .lobby, .live, .ended { grid-template-columns: 1fr; } .stage { padding: 24px; } }
+  </style>
+</head>
+<body class="ink">
+  <div id="app"><p class="muted" style="padding: 40px;">Connecting…</p></div>
+  <script type="module" src="/host.js"></script>
+</body>
+</html>

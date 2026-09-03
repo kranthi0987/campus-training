@@ -1,0 +1,95 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&amp;family=Public+Sans:wght@400;500;600;700&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: "Public Sans", "Segoe UI", system-ui, sans-serif; color: #f3efe6; -webkit-font-smoothing: antialiased; }
+    a { color: #f2a93b; } a:hover { color: #ffc46b; }
+    .display { font-family: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif; }
+    button { font-family: "Public Sans", "Segoe UI", system-ui, sans-serif; cursor: pointer; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; background: #0f1626; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box;">
+
+  <div style="height: 72px; padding: 0 48px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2a3452; box-sizing: border-box;">
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <div class="display" style="font-weight: 800; font-size: 18px;">Daily Quiz</div>
+      <div style="width: 1px; height: 24px; background: #2a3452;"></div>
+      <div class="display" style="font-weight: 700; font-size: 16px; color: #c9cfdc;">Day 4 · HVAC Fundamentals</div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <button style="height: 40px; padding: 0 16px; border: 1px solid #2a3452; background: transparent; border-radius: 8px; font-weight: 600; font-size: 14px; color: #f3efe6;">Export results</button>
+      <button style="height: 40px; padding: 0 16px; border: 0; background: #f2a93b; border-radius: 8px; font-weight: 700; font-size: 14px; color: #1c1a17;">End session</button>
+    </div>
+  </div>
+
+  <div style="flex: 1; display: grid; grid-template-columns: 620px minmax(0, 1fr); gap: 56px; padding: 40px 48px 48px; min-height: 0; box-sizing: border-box;">
+
+    <div style="display: flex; flex-direction: column; gap: 32px;">
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #9aa3b8;">Final scoreboard</div>
+        <div class="display" style="font-weight: 800; font-size: 44px; letter-spacing: -0.02em; line-height: 1.05;">Well played, everyone.</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: end;">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 12px;">
+          <div style="width: 64px; height: 64px; border-radius: 50%; background: #2a3452; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px;">JL</div>
+          <div style="text-align: center;">
+            <div style="font-size: 16px; font-weight: 600;">Jenna L.</div>
+            <div class="display" style="font-weight: 800; font-size: 26px; color: #c9cfdc;">1,100</div>
+          </div>
+          <div style="width: 100%; height: 120px; background: #182036; border: 1px solid #2a3452; border-radius: 12px 12px 0 0; display: flex; align-items: flex-start; justify-content: center; padding-top: 14px; box-sizing: border-box;"><span class="display" style="font-weight: 800; font-size: 22px; color: #9aa3b8;">2</span></div>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 12px;">
+          <div style="width: 80px; height: 80px; border-radius: 50%; background: #f2a93b; color: #1c1a17; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 22px;">MA</div>
+          <div style="text-align: center;">
+            <div style="font-size: 18px; font-weight: 700;">Marcus A.</div>
+            <div class="display" style="font-weight: 800; font-size: 34px; color: #f2a93b;">1,200</div>
+          </div>
+          <div style="width: 100%; height: 170px; background: #f2a93b; border-radius: 12px 12px 0 0; display: flex; align-items: flex-start; justify-content: center; padding-top: 14px; box-sizing: border-box;"><span class="display" style="font-weight: 800; font-size: 26px; color: #1c1a17;">1</span></div>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 12px;">
+          <div style="width: 64px; height: 64px; border-radius: 50%; background: #2a3452; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px;">AK</div>
+          <div style="text-align: center;">
+            <div style="font-size: 16px; font-weight: 600;">Aisha K.</div>
+            <div class="display" style="font-weight: 800; font-size: 26px; color: #c9cfdc;">1,000</div>
+          </div>
+          <div style="width: 100%; height: 90px; background: #182036; border: 1px solid #2a3452; border-radius: 12px 12px 0 0; display: flex; align-items: flex-start; justify-content: center; padding-top: 14px; box-sizing: border-box;"><span class="display" style="font-weight: 800; font-size: 22px; color: #9aa3b8;">3</span></div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 32px; font-size: 14px; color: #9aa3b8;">
+        <div><span class="display" style="font-weight: 700; font-size: 18px; color: #f3efe6;">18</span> players</div>
+        <div><span class="display" style="font-weight: 700; font-size: 18px; color: #f3efe6;">12</span> questions</div>
+        <div><span class="display" style="font-weight: 700; font-size: 18px; color: #f3efe6;">21:40</span> of 30:00 used</div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; min-height: 0; background: #182036; border: 1px solid #2a3452; border-radius: 14px; overflow: hidden;">
+      <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr) 260px 110px 110px; gap: 12px; padding: 14px 24px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #6b7590; border-bottom: 1px solid #2a3452;">
+        <span>Rank</span><span>Name</span><span>Email</span><span style="text-align: right;">Correct</span><span style="text-align: right;">Points</span>
+      </div>
+      <div style="flex: 1; overflow: auto; display: flex; flex-direction: column;">
+        <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr) 260px 110px 110px; gap: 12px; align-items: center; padding: 14px 24px; border-bottom: 1px solid #222c45; font-size: 15px;"><span class="display" style="font-weight: 700; color: #9aa3b8;">4</span><span style="font-weight: 600;">Devon O.</span><span style="font-size: 13px; color: #9aa3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">devon.o@example.com</span><span style="text-align: right; color: #c9cfdc;">9 / 12</span><span class="display" style="text-align: right; font-weight: 700;">900</span></div>
+        <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr) 260px 110px 110px; gap: 12px; align-items: center; padding: 14px 24px; border-bottom: 1px solid #222c45; font-size: 15px;"><span class="display" style="font-weight: 700; color: #9aa3b8;">5</span><span style="font-weight: 600;">Sam R.</span><span style="font-size: 13px; color: #9aa3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">sam.r@example.com</span><span style="text-align: right; color: #c9cfdc;">9 / 12</span><span class="display" style="text-align: right; font-weight: 700;">900</span></div>
+        <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr) 260px 110px 110px; gap: 12px; align-items: center; padding: 14px 24px; border-bottom: 1px solid #222c45; font-size: 15px;"><span class="display" style="font-weight: 700; color: #9aa3b8;">6</span><span style="font-weight: 600;">Grace S.</span><span style="font-size: 13px; color: #9aa3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">grace.s@example.com</span><span style="text-align: right; color: #c9cfdc;">8 / 12</span><span class="display" style="text-align: right; font-weight: 700;">800</span></div>
+        <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr) 260px 110px 110px; gap: 12px; align-items: center; padding: 14px 24px; border-bottom: 1px solid #222c45; font-size: 15px;"><span class="display" style="font-weight: 700; color: #9aa3b8;">7</span><span style="font-weight: 600;">Tom B.</span><span style="font-size: 13px; color: #9aa3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">tom.b@example.com</span><span style="text-align: right; color: #c9cfdc;">7 / 12</span><span class="display" style="text-align: right; font-weight: 700;">700</span></div>
+        <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr) 260px 110px 110px; gap: 12px; align-items: center; padding: 14px 24px; border-bottom: 1px solid #222c45; font-size: 15px;"><span class="display" style="font-weight: 700; color: #9aa3b8;">8</span><span style="font-weight: 600;">Luis N.</span><span style="font-size: 13px; color: #9aa3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">luis.n@example.com</span><span style="text-align: right; color: #c9cfdc;">7 / 12</span><span class="display" style="text-align: right; font-weight: 700;">700</span></div>
+        <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr) 260px 110px 110px; gap: 12px; align-items: center; padding: 14px 24px; border-bottom: 1px solid #222c45; font-size: 15px;"><span class="display" style="font-weight: 700; color: #9aa3b8;">9</span><span style="font-weight: 600;">Rae W.</span><span style="font-size: 13px; color: #9aa3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">rae.w@example.com</span><span style="text-align: right; color: #c9cfdc;">6 / 12</span><span class="display" style="text-align: right; font-weight: 700;">600</span></div>
+        <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr) 260px 110px 110px; gap: 12px; align-items: center; padding: 14px 24px; border-bottom: 1px solid #222c45; font-size: 15px;"><span class="display" style="font-weight: 700; color: #9aa3b8;">10</span><span style="font-weight: 600;">Kiran P.</span><span style="font-size: 13px; color: #9aa3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">kiran.p@example.com</span><span style="text-align: right; color: #c9cfdc;">6 / 12</span><span class="display" style="text-align: right; font-weight: 700;">600</span></div>
+        <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr) 260px 110px 110px; gap: 12px; align-items: center; padding: 14px 24px; border-bottom: 1px solid #222c45; font-size: 15px;"><span class="display" style="font-weight: 700; color: #9aa3b8;">11</span><span style="font-weight: 600;">Eli H.</span><span style="font-size: 13px; color: #9aa3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">eli.h@example.com</span><span style="text-align: right; color: #c9cfdc;">5 / 12</span><span class="display" style="text-align: right; font-weight: 700;">500</span></div>
+        <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr) 260px 110px 110px; gap: 12px; align-items: center; padding: 14px 24px; border-bottom: 1px solid #222c45; font-size: 15px;"><span class="display" style="font-weight: 700; color: #9aa3b8;">12</span><span style="font-weight: 600;">Nora C.</span><span style="font-size: 13px; color: #9aa3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">nora.c@example.com</span><span style="text-align: right; color: #c9cfdc;">5 / 12</span><span class="display" style="text-align: right; font-weight: 700;">500</span></div>
+        <div style="display: flex; align-items: center; justify-content: center; padding: 16px; font-size: 13px; color: #6b7590;">6 more players</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

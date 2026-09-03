@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&amp;family=Public+Sans:wght@400;500;600;700&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: "Public Sans", "Segoe UI", system-ui, sans-serif; color: #1c1a17; -webkit-font-smoothing: antialiased; }
+    a { color: #b8771a; } a:hover { color: #8f5a0f; }
+    .display { font-family: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif; }
+    button { font-family: "Public Sans", "Segoe UI", system-ui, sans-serif; cursor: pointer; }
+  </style>
+</helmet>
+<div style="width: 390px; height: 844px; background: #f6f4ef; display: flex; flex-direction: column; padding: 72px 24px 32px; box-sizing: border-box; overflow: hidden;">
+
+  <div style="display: flex; flex-direction: column; gap: 4px;">
+    <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #6f6a61;">Ferguson Training · Daily Quiz</div>
+    <div class="display" style="font-weight: 800; font-size: 30px; letter-spacing: -0.02em; line-height: 1.1; margin-top: 8px;">Join today's session</div>
+    <div style="font-size: 14px; color: #6f6a61; margin-top: 4px;">Day 4 · HVAC Fundamentals</div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 18px; margin-top: 36px;">
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <label style="font-size: 12px; font-weight: 600; color: #6f6a61;">Session code</label>
+      <div style="height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border: 2px solid #2f9e6a; border-radius: 10px; background: #f2faf5; box-sizing: border-box;">
+        <span class="display" style="font-weight: 800; font-size: 22px; letter-spacing: 0.14em;">KX4-7PQ</span>
+        <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #2f9e6a;">
+          <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="#2f9e6a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5l2.5 2.5 4.5-5"></path></svg>
+          From QR
+        </span>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <label style="font-size: 12px; font-weight: 600; color: #6f6a61;">Your name</label>
+      <div style="height: 52px; display: flex; align-items: center; padding: 0 16px; border: 1px solid #d6d0c4; border-radius: 10px; background: #ffffff; font-size: 16px; color: #9a948a; box-sizing: border-box;">Shown on the scoreboard</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <label style="font-size: 12px; font-weight: 600; color: #6f6a61;">Work email</label>
+      <div style="height: 52px; display: flex; align-items: center; padding: 0 16px; border: 1px solid #d6d0c4; border-radius: 10px; background: #ffffff; font-size: 16px; color: #9a948a; box-sizing: border-box;">you@company.com</div>
+      <div style="font-size: 12px; color: #9a948a;">Used to record your result for this session.</div>
+    </div>
+  </div>
+
+  <button style="margin-top: 28px; height: 56px; border: 0; background: #f2a93b; border-radius: 10px; font-weight: 700; font-size: 16px; color: #1c1a17;">Join session</button>
+
+  <div style="margin-top: auto; display: flex; gap: 12px; padding: 14px 16px; background: #fffdf9; border: 1px solid #e4dfd5; border-radius: 10px;">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#b8771a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M3 16h14M6 16V9M10 16V4M14 16v-5"></path></svg>
+    <div style="font-size: 13px; line-height: 1.45; color: #6f6a61;"><strong style="color: #1c1a17;">100 points</strong> for every correct answer, 0 for a wrong one. Each question has its own timer.</div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

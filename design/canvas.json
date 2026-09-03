@@ -1,0 +1,17 @@
+{
+  "artboards": [
+    { "file": "TrainerLogin.dc.html", "title": "1 · Trainer sign-in", "x": 0, "y": 0, "w": 1440, "h": 900 },
+    { "file": "Main.dc.html", "title": "2 · Session builder (trainer)", "x": 1540, "y": 0, "w": 1440, "h": 900 },
+    { "file": "HostLobby.dc.html", "title": "3 · Lobby on the projector", "x": 0, "y": 1040, "w": 1440, "h": 900 },
+    { "file": "Scoreboard.dc.html", "title": "6 · Final scoreboard", "x": 1540, "y": 1040, "w": 1440, "h": 900 },
+    { "file": "StudentJoin.dc.html", "title": "4 · Student joins (phone)", "x": 3100, "y": 0, "w": 390, "h": 844 },
+    { "file": "StudentQuestion.dc.html", "title": "5 · Student answers (phone)", "x": 3580, "y": 0, "w": 390, "h": 844 },
+    { "file": "DirectionB.dc.html", "title": "Alternate direction B", "x": 0, "y": 2100, "w": 720, "h": 480 },
+    { "file": "DirectionC.dc.html", "title": "Alternate direction C", "x": 820, "y": 2100, "w": 720, "h": 480 }
+  ],
+  "annotations": [
+    { "id": "flow-note", "x": 3100, "y": 1040, "w": 560, "text": "Flow: trainer signs in (1) and builds the session (2). In the room the projector shows the lobby (3); students scan the QR or type the code, then give name and email (4). Each question runs on its own timer set by complexity (5); the session clock caps the whole run. Scoreboard closes it (6).\n\nScoring: correct = 100, wrong = 0. Default timers: Easy 20 s, Medium 40 s, Hard 60 s. Both are editable per session." },
+    { "id": "direction-note", "x": 1640, "y": 2100, "w": 420, "text": "Main direction (screens 1 to 6): warm paper for the trainer's desk, deep ink for anything on a projector or a phone in the room, one amber accent. Below are two different directions kept as sketches only. Say the word and I rebuild the six screens in either." }
+  ],
+  "launch": { "view": "canvas" }
+}

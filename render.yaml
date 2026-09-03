@@ -1,0 +1,29 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# Free tier: the filesystem is ephemeral, so the SQLite database (and every trainer
+# account, participant and score) is wiped on each deploy or restart. The app re-seeds
+# the sessions and question banks automatically on an empty database.
+services:
+  - type: web
+    name: ferguson-training-quiz
+    runtime: node
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # PUBLIC_URL is taken from RENDER_EXTERNAL_URL automatically; set it here only
+      # if you put a custom domain in front of the service.
+      # - key: PUBLIC_URL
+      #   value: https://quiz.example.com
+    # To keep data between restarts, move to a paid instance and uncomment:
+    # plan: starter
+    # disk:
+    #   name: data
+    #   mountPath: /var/data
+    #   sizeGB: 1
+    # envVars:
+    #   - key: DB_PATH
+    #     value: /var/data/daily-quiz.sqlite

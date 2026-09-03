@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trainer · Ferguson Training</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .login { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+    .login .side { background: var(--ink); color: var(--on-ink); padding: 56px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }
+    .login .side::after { content: ""; position: absolute; right: -140px; bottom: -140px; width: 480px; height: 480px; border-radius: 50%; border: 96px solid var(--ink-2); z-index: 0; }
+    .login .side > * { position: relative; z-index: 1; }
+    .login .form { display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .login .form .card { width: 100%; max-width: 440px; padding: 40px; box-shadow: 0 24px 48px -32px rgba(15,22,38,0.25); }
+    .builder { display: grid; grid-template-columns: 420px minmax(0, 1fr); gap: 24px; align-items: start; }
+    .qrow { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); cursor: pointer; font-size: 13px; }
+    .qrow:hover { background: var(--wash); }
+    .qrow.active { background: var(--amber-wash); box-shadow: inset 3px 0 0 var(--amber); font-weight: 600; }
+    .qrow .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .qrow .num { width: 22px; text-align: right; color: var(--faint); font-size: 12px; }
+    .qrow .sec { width: 34px; text-align: right; color: var(--muted); font-size: 12px; }
+    .qlist { max-height: 60vh; overflow: auto; }
+    .seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); height: 44px; border: 1px solid var(--input); border-radius: 8px; overflow: hidden; background: #fff; }
+    .seg button { border: 0; border-right: 1px solid var(--line); background: transparent; font-weight: 600; font-size: 13px; color: var(--muted); cursor: pointer; }
+    .seg button:last-child { border-right: 0; }
+    .seg button.on.easy { background: var(--easy); color: #fff; } .seg button.on.medium { background: var(--medium); color: #fff; } .seg button.on.hard { background: var(--hard); color: #fff; }
+    .optrow { display: flex; align-items: center; gap: 10px; }
+    .optrow .radio { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #c9c3b7; cursor: pointer; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
+    .optrow .radio.on { border-color: var(--easy); background: var(--easy); }
+    .optrow .key { width: 18px; font-family: var(--display); font-weight: 700; color: var(--faint); }
+    .sessions td .display { font-size: 15px; }
+    .modal-bg { position: fixed; inset: 0; background: rgba(15,22,38,0.5); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 40; }
+    .modal { width: 100%; max-width: 720px; max-height: 90vh; overflow: auto; }
+    .picklist { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow: auto; border: 1px solid var(--input); border-radius: 8px; padding: 10px 12px; background: #fff; }
+    @media (max-width: 900px) { .login { grid-template-columns: 1fr; } .login .side { display: none; } .builder { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/trainer.js"></script>
+</body>
+</html>
