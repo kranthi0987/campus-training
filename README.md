@@ -149,15 +149,17 @@ no manual configuration.
 Free-tier limits to plan around:
 
 - **No persistent disk, so the database lives in Render Postgres.** The instance disk is
-  ephemeral (wiped on deploy, restart and after 15 idle minutes). `render.yaml` therefore
-  creates a free Postgres database and hands its `DATABASE_URL` to the service; the app
-  restores the latest snapshot of the SQLite file from it at boot and stores a fresh one a
-  few seconds after every change and on shutdown (`server/persist.js`), so accounts,
-  participants, answers and scores survive. The first boot with an empty database starts
-  from the committed `data/daily-quiz.sqlite`. Free Postgres databases expire 30 days after
-  creation: create a new one before then (Blueprint → apply) or upgrade it.
+  ephemeral (wiped on deploy, restart and after 15 idle minutes). A free Render Postgres
+  database ("campustraining", created in the dashboard) holds a snapshot of the SQLite
+  file: set the service's `DATABASE_URL` to the database's *internal* connection string and
+  the app restores the latest snapshot at boot, then stores a fresh one a few seconds after
+  every change and on shutdown (`server/persist.js`), so accounts, participants, answers
+  and scores survive. With no snapshot stored, the first boot starts from the committed
+  `data/daily-quiz.sqlite`. Only the hosted service may use the store: a laptop server
+  pointed at the same database would overwrite its snapshots. Free Postgres databases
+  expire 30 days after creation, so download a copy before then.
   `scripts/snapshot.mjs download|upload|reset` works with the snapshot from your laptop
-  using the database's external connection string. Download certificates
+  using the database's *external* connection string in `DATABASE_URL`. Download certificates
   and check scorecards before the session ends. For durable data upgrade the service
   to a paid instance, attach a disk and set `DB_PATH` (see the comments in
   `render.yaml`).

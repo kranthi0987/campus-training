@@ -1,9 +1,8 @@
 # Render Blueprint: https://render.com/docs/blueprint-spec
 # Free tier: the filesystem is ephemeral, so the SQLite file on the instance is wiped on each
-# deploy, restart and idle spin-down. The free Postgres database below keeps a snapshot of it:
+# deploy, restart and idle spin-down. A free Render Postgres database keeps a snapshot of it:
 # the app restores the snapshot at boot and saves a fresh one a few seconds after every change
-# (see server/persist.js). Free Postgres databases expire 30 days after creation; create a new
-# one (or upgrade it) before then and the next boot starts again from the committed file.
+# (see server/persist.js).
 services:
   - type: web
     name: ferguson-training-quiz
@@ -20,12 +19,11 @@ services:
       # deploys and restarts; without it a fresh secret is generated on every start.
       - key: SESSION_SECRET
         generateValue: true
-      # Durable copy of the database (server/persist.js). Remove this variable to run on the
-      # ephemeral disk alone.
+      # Durable copy of the database (server/persist.js): the *internal* connection string of
+      # the Render Postgres database "campustraining", pasted in the dashboard (never committed).
+      # Remove the variable to run on the ephemeral disk alone.
       - key: DATABASE_URL
-        fromDatabase:
-          name: ferguson-training-db
-          property: connectionString
+        sync: false
       # PUBLIC_URL is taken from RENDER_EXTERNAL_URL automatically; set it here only
       # if you put a custom domain in front of the service.
       # - key: PUBLIC_URL
@@ -40,8 +38,6 @@ services:
     #   - key: DB_PATH
     #     value: /var/data/daily-quiz.sqlite
 
-databases:
-  - name: ferguson-training-db
-    plan: free
-    databaseName: ferguson_training
-    user: ferguson_training
+# The Postgres database (free plan, created by hand in the dashboard as "campustraining") is not
+# managed here so a Blueprint sync never recreates it. Free Postgres expires 30 days after
+# creation: download the snapshot (scripts/snapshot.mjs) before then.
