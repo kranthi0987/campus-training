@@ -359,8 +359,10 @@ function fromQuestion(q) { return { text: q.text, code: q.code || '', options: [
 function renderBuilder() {
   const s = current.session, qs = current.questions;
   const totalSeconds = qs.reduce((a, q) => a + (q.seconds || { easy: s.easyS, medium: s.mediumS, hard: s.hardS }[q.complexity]), 0);
+  const slideOf = new Map();
+  if (current.deck) for (const [k, picks] of Object.entries(cpDraft || checkpointPicks(s, current.deck.slides, qs))) for (const id of picks) slideOf.set(id, Number(k) + 1);
   const list = qs.map((q, i) => html`<div class="qrow ${editing?.id === q.id ? 'active' : ''}" data-id="${q.id}">
-      <span class="num">${i + 1}</span><span class="t">${q.text}</span>${pill(q.complexity)}<span class="sec">${q.seconds || { easy: s.easyS, medium: s.mediumS, hard: s.hardS }[q.complexity]}s</span>
+      <span class="num">${i + 1}</span><span class="t">${q.text}</span>${slideOf.has(q.id) ? html`<span class="tiny muted" style="white-space: nowrap; flex: none;" title="Asked right after this slide">slide ${slideOf.get(q.id)}</span>` : ''}${pill(q.complexity)}<span class="sec">${q.seconds || { easy: s.easyS, medium: s.mediumS, hard: s.hardS }[q.complexity]}s</span>
     </div>`);
   const d = draft;
   const editor = html`
@@ -398,13 +400,14 @@ function renderBuilder() {
       </div>
     </div>`;
 
-  // Quiz checkpoints: how many questions to run after each slide (questions are taken in list order).
+  // Quiz checkpoints: which questions (by list number) run right after each slide.
   let checkpointsCard = '';
   if (current.deck) {
     const slides = current.deck.slides;
-    const saved = Object.fromEntries(slides.map((sl, i) => [i, sl.askAfter || 0]).filter(([, n]) => n));
-    const cps = cpDraft || saved;
-    const placed = Object.values(cps).reduce((a, b) => a + b, 0);
+    const cps = cpDraft || checkpointPicks(s, slides, qs);
+    const numberOf = new Map(qs.map((q, i) => [q.id, i + 1]));
+    const assigned = new Set(Object.values(cps).flat());
+    const unassigned = qs.map((q, i) => i + 1).filter((n) => !assigned.has(qs[n - 1].id));
     const custom = s.checkpoints !== null;
     let lastSection = null;
     checkpointsCard = html`
@@ -416,15 +419,16 @@ function renderBuilder() {
             ${cpDraft ? html`<button class="btn sm ghost" id="cpCancel">Cancel</button><button class="btn sm dark" id="cpSave">Save checkpoints</button>` : ''}
           </div>
         </div>
-        <div class="wash row" style="gap: 8px;">${raw(icon('info'))}<span>Type how many questions to ask right after a slide. Questions run in list order: the first checkpoint gets questions 1 to N and the next one continues from there. ${placed ? html`<strong>${Math.min(placed, qs.length)} of ${qs.length}</strong> placed during the slides; ${qs.length > placed ? `the remaining ${qs.length - placed} run from the host screen at the end.` : 'nothing is left for the end.'}` : 'None placed yet: the whole quiz runs from the host screen at the end.'}${placed > qs.length ? html` <strong style="color: var(--hard);">${placed - qs.length} more than the session has; the last checkpoints will ask nothing.</strong>` : ''}</span></div>
+        <div class="wash row" style="gap: 8px; align-items: flex-start;">${raw(icon('info'))}<span>Type the question numbers to ask right after a slide, like <span class="mono">3, 7, 12</span> (numbers as in the list below). A question can follow only one slide. ${assigned.size ? html`<strong>${assigned.size} of ${qs.length}</strong> placed during the slides.` : 'None placed yet.'} ${unassigned.length ? html`Not placed: <span class="mono">${unassigned.slice(0, 20).join(', ')}${unassigned.length > 20 ? '…' : ''}</span>; ${unassigned.length === qs.length ? 'the whole quiz' : 'they'} run${unassigned.length === 1 ? 's' : ''} from the host screen at the end.` : 'Nothing is left for the end.'}</span></div>
         <div class="stack" style="gap: 0; max-height: 420px; overflow: auto; border: 1px solid var(--line-soft); border-radius: 8px;">
           ${slides.map((sl, i) => {
             const head = sl.sectionId !== lastSection ? html`<div class="tiny muted" style="padding: 8px 12px 4px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; background: var(--wash);">${sl.sectionTitle}</div>` : '';
             lastSection = sl.sectionId;
-            const n = cps[i] || 0;
-            return html`${head}<div class="row between" style="gap: 10px; padding: 6px 12px; border-top: 1px solid var(--line-soft); ${n ? 'background: #f2f8fd;' : ''}">
+            const picks = cps[i] || [];
+            const nums = picks.map((id) => numberOf.get(id)).filter(Boolean);
+            return html`${head}<div class="row between" style="gap: 10px; padding: 6px 12px; border-top: 1px solid var(--line-soft); ${nums.length ? 'background: #f2f8fd;' : ''}">
               <span class="small" style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><span class="muted">${i + 1}.</span> ${sl.title}</span>
-              <span class="row" style="gap: 6px; flex: none;"><input class="input" data-cp="${i}" type="number" min="0" max="${qs.length}" value="${n || ''}" placeholder="0" style="width: 64px; height: 32px; padding: 0 8px; font-weight: 700; text-align: center;"><span class="tiny muted" style="width: 62px;">${n ? `question${n === 1 ? '' : 's'} after` : ''}</span></span>
+              <span class="row" style="gap: 6px; flex: none;"><input class="input mono" data-cp="${i}" value="${nums.join(', ')}" placeholder="e.g. 1, 2" title="Question numbers to ask after this slide" style="width: 128px; height: 32px; padding: 0 8px; font-weight: 700; font-size: 13px;"><span class="tiny muted" style="width: 30px;">${nums.length ? `${nums.length} q` : ''}</span></span>
             </div>`;
           })}
         </div>
@@ -498,11 +502,30 @@ function renderBuilder() {
   $$('[data-reveal]').forEach((b) => b.addEventListener('click', () => saveSettings({ reveal: b.dataset.reveal })));
   // checkpoints
   $$('[data-cp]').forEach((inp) => inp.addEventListener('change', () => {
-    const slides = current.deck.slides;
-    const base = cpDraft || Object.fromEntries(slides.map((sl, i) => [i, sl.askAfter || 0]).filter(([, n]) => n));
-    const n = Math.max(0, Math.min(qs.length, Number(inp.value) || 0));
-    cpDraft = { ...base };
-    if (n) cpDraft[inp.dataset.cp] = n; else delete cpDraft[inp.dataset.cp];
+    const slide = inp.dataset.cp;
+    const base = cpDraft || checkpointPicks(s, current.deck.slides, qs);
+    const seen = new Set();
+    const bad = [];
+    const ids = [];
+    for (const tok of inp.value.split(/[\s,;]+/).filter(Boolean)) {
+      const n = Number(tok);
+      if (!Number.isInteger(n) || n < 1 || n > qs.length) { bad.push(tok); continue; }
+      if (seen.has(n)) continue;
+      seen.add(n);
+      ids.push(qs[n - 1].id);
+    }
+    if (bad.length) toast(`No question ${bad.join(', ')}: the list has ${qs.length}`, { error: true });
+    cpDraft = {};
+    const taken = new Set(ids);
+    let moved = 0;
+    for (const [k, picks] of Object.entries(base)) {
+      if (k === slide) continue;
+      const kept = picks.filter((id) => !taken.has(id));
+      moved += picks.length - kept.length;
+      if (kept.length) cpDraft[k] = kept;
+    }
+    if (ids.length) cpDraft[slide] = ids;
+    if (moved) toast(`${moved} question${moved === 1 ? '' : 's'} moved here from another slide`);
     renderBuilder();
   }));
   $('#cpSave')?.addEventListener('click', () => saveCheckpoints(cpDraft));
@@ -525,6 +548,28 @@ function renderBuilder() {
     try { current.questions = (await api(`/api/questions/${editing.id}`, { method: 'DELETE' })).questions; editing = current.questions[0] || null; draft = editing ? fromQuestion(editing) : blankDraft(); renderBuilder(); }
     catch (err) { toast(err.message, { error: true }); }
   });
+}
+
+/**
+ * The questions (ids) each slide asks: the session's own picks when set, otherwise what the deck's
+ * askAfter counts imply, taken in list order (slide with askAfter 3 gets questions 1–3, the next
+ * one 4–6, and so on) so the trainer sees numbers they can edit.
+ */
+function checkpointPicks(s, slides, qs) {
+  if (s.checkpoints) {
+    const ids = new Set(qs.map((q) => q.id));
+    return Object.fromEntries(Object.entries(s.checkpoints).map(([k, v]) => [k, (v || []).filter((id) => ids.has(id))]).filter(([, v]) => v.length));
+  }
+  const out = {};
+  let c = 0;
+  slides.forEach((sl, i) => {
+    const n = sl.askAfter || 0;
+    if (!n) return;
+    const picks = qs.slice(c, c + n).map((q) => q.id);
+    c += n;
+    if (picks.length) out[i] = picks;
+  });
+  return out;
 }
 
 async function saveCheckpoints(checkpoints) {

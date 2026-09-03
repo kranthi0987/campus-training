@@ -46,8 +46,37 @@ export class Live {
     return rowToSession(this.db.prepare('SELECT * FROM sessions WHERE join_code = ?').get(c));
   }
 
-  questions(sessionId) {
+  /** The questions as the trainer lists them (position order): what the builder shows and numbers by. */
+  listQuestions(sessionId) {
     return this.db.prepare('SELECT * FROM questions WHERE session_id = ? ORDER BY position, id').all(sessionId).map(rowToQuestion);
+  }
+
+  /**
+   * The questions in the order they are asked. With per-session checkpoints the questions picked
+   * for each slide come first, slide by slide, then everything unassigned in list order; the
+   * engine only ever walks this order, so "question 3 of 24" means the third one asked.
+   */
+  questions(sessionId, session = null) {
+    const list = this.listQuestions(sessionId);
+    const s = session || this.session(sessionId);
+    const cps = this.effectiveCheckpoints(s, list);
+    if (!cps) return list;
+    const byId = new Map(list.map((q) => [q.id, q]));
+    const picked = Object.keys(cps).map(Number).sort((a, b) => a - b).flatMap((slide) => cps[slide].map((id) => byId.get(id)));
+    const pickedIds = new Set(picked.map((q) => q.id));
+    return [...picked, ...list.filter((q) => !pickedIds.has(q.id))];
+  }
+
+  /** The session's checkpoints ({"<slide index>": [question ids]}) minus questions that no longer exist; null = none set. */
+  effectiveCheckpoints(s, list = null) {
+    if (!s || !s.checkpoints || typeof s.checkpoints !== 'object') return null;
+    const ids = new Set((list || this.listQuestions(s.id)).map((q) => q.id));
+    const out = {};
+    for (const [slide, picks] of Object.entries(s.checkpoints)) {
+      const kept = (Array.isArray(picks) ? picks : []).map(Number).filter((id) => ids.has(id));
+      if (kept.length) out[slide] = kept;
+    }
+    return out;
   }
 
   questionAt(sessionId, index) {
@@ -101,7 +130,7 @@ export class Live {
   /** The deck to present: the seeded slides, or a content page built from the session's subtopics. */
   deckForSession(s) {
     const real = s.slidesKey ? this.decks.get(s.slidesKey) : null;
-    if (real) return applyCheckpoints(real, s.checkpoints);
+    if (real) return applyCheckpoints(real, this.effectiveCheckpoints(s));
     const topics = String(s.subtopics || '').split(',').map((t) => t.trim()).filter(Boolean);
     return {
       key: `session-${s.id}`, title: s.title, synthetic: true,
@@ -658,8 +687,9 @@ export function stepsOf(sl) {
 }
 
 /**
- * A session's own checkpoints ({"<flat slide index>": questions}) replace the deck's askAfter values
- * wholesale; null keeps the deck as authored.
+ * A session's own checkpoints ({"<flat slide index>": [question ids]}) replace the deck's askAfter
+ * values wholesale: each listed slide asks as many questions as it has picks. null keeps the deck
+ * as authored.
  */
 export function applyCheckpoints(deck, checkpoints) {
   if (!checkpoints || typeof checkpoints !== 'object') return deck;
@@ -669,7 +699,8 @@ export function applyCheckpoints(deck, checkpoints) {
     sections: (deck.sections || []).map((sec) => ({
       ...sec,
       slides: (sec.slides || []).map((sl) => {
-        const n = Number(checkpoints[flat++]) || 0;
+        const picks = checkpoints[flat++];
+        const n = Array.isArray(picks) ? picks.length : 0;
         const { askAfter, ...rest } = sl;
         return n > 0 ? { ...rest, askAfter: n } : rest;
       }),

@@ -1,9 +1,9 @@
-// "Ferguson_Fresher_Training_Git_Docker_Kubernetes_CICD.pptx" (Vishnu Chaturvedi, 56 slides; the ETL/Databricks half has no deck yet)
+// "Ferguson_Fresher_Training_Git_Docker_Kubernetes_CICD.pptx" (Vishnu Chaturvedi, slides 1–56) followed by "The Fresher's Guide to Azure ETL.pptx" (Santoshini Panda, slides 57–71)
 // Text carried over slide by slide from the trainer's deck; the slides themselves are the exported
-// pictures under public/decks/day14-devops-etl/ (56 slides), so these bullets are talking points.
+// pictures under public/decks/day14-devops-etl/ (71 slides), so these bullets are talking points.
 export default {
   key: "day14-devops-etl",
-  title: "Tech Refresher – Git, Docker, Kubernetes & CI/CD",
+  title: "Tech Refresher – Git, Docker, Kubernetes, CI/CD & Azure ETL",
   sections: [
     {
       id: "agenda",
@@ -96,6 +96,45 @@ export default {
                 "Part 5 — Building the Puzzle: Capstone & Recap",
                 "End-to-End Delivery",
                 "Final Recap"
+              ]
+            },
+            {
+              id: "etl-intro",
+              title: "Azure ETL: intro & roadmap",
+              count: 3,
+              first: [
+                "The Fresher's Guide to Azure ETL",
+                "Agenda",
+                "A Freshers’ Roadmap for Data Engineer"
+              ]
+            },
+            {
+              id: "etl-core",
+              title: "Azure ETL building blocks",
+              count: 7,
+              first: [
+                "Core ETL Architecture",
+                "SQL Server — Your Data Foundation",
+                "Azure Blob Storage — The Landing Zone"
+              ]
+            },
+            {
+              id: "etl-e2e",
+              title: "End-to-end ETL",
+              count: 2,
+              first: [
+                "End-to-End ETL Architecture",
+                "How ADF + Databricks + GitHub Work Together"
+              ]
+            },
+            {
+              id: "etl-recap",
+              title: "ETL recap, hands-on & careers",
+              count: 3,
+              first: [
+                "Building the puzzle: recap & hands-on",
+                "Where These Skills Can Take You",
+                "Thank you!"
               ]
             }
           ]
@@ -764,6 +803,245 @@ export default {
             "+91-7395902450",
             "FERGUSON.COM",
             "Vishnu.Chaturvedi@ferguson.com"
+          ],
+          note: ""
+        }
+      ]
+    },
+    {
+      id: "etl-intro",
+      title: "Azure ETL: intro & roadmap",
+      slides: [
+        {
+          title: "The Fresher's Guide to Azure ETL",
+          bullets: [
+            "SANTOSHINI PANDA",
+            "Senior Software Engineer",
+            "I’m a Senior Data Engineer at Ferguson, with over 8 years of experience in ETL, Data Engineering, and Data Warehousing. My core expertise includes SQL,…",
+            "Career question: “Do I enjoy building pipelines, solving data problems, or turning data into business outcomes?”",
+            "Challenge yourself",
+            "Master a tool at a time, pick a direction.",
+            "Learn the “why” first → practice the “how” → automate the repeatable.",
+            "Progressive Mindset"
+          ],
+          note: ""
+        },
+        {
+          title: "Agenda",
+          bullets: [
+            "Technology / Topic Overview What it is why it exists where it fits Basics / Foundation ETL flow data layers common terms Core Concepts SQL Server Blob ADF…",
+            "01 02 03 04 05 06",
+            "8/31/26"
+          ],
+          note: ""
+        },
+        {
+          title: "A Freshers’ Roadmap for Data Engineer",
+          bullets: [
+            "Core SQL Mastery",
+            "Azure Storage Basics",
+            "ADF Pipeline Building",
+            "Databricks PySpark Fundamentals"
+          ],
+          note: ""
+        }
+      ]
+    },
+    {
+      id: "etl-core",
+      title: "Azure ETL building blocks",
+      slides: [
+        {
+          title: "Core ETL Architecture",
+          bullets: [
+            "EXTRACT",
+            "Get data from sources",
+            "TRANSFORM",
+            "Clean, join, validate, enrich",
+            "LOAD",
+            "Store data for analytics/use",
+            "SERVE",
+            "Reports, apps, models, decisions",
+            "Modern cloud pipelines often use ELT as well: load first, transform in the target platform.",
+            "ETL"
+          ],
+          note: ""
+        },
+        {
+          title: "SQL Server — Your Data Foundation",
+          bullets: [
+            "What it is",
+            "Relational database platform Tables, views, stored procedures Keys & relationships Transactions & security",
+            "Why ETL needs it",
+            "Common source/target system Query and filter data Validate business rules Create repeatable extracts",
+            "Freshers should learn",
+            "SELECT JOIN GROUP BY CTEs window functions Indexes data types NULLs",
+            "SQL query example",
+            "Illustrative",
+            "ETL checkpoint",
+            "Think like a data engineer"
+          ],
+          note: ""
+        },
+        {
+          title: "Azure Blob Storage — The Landing Zone",
+          bullets: [
+            "What it is",
+            "Cloud object storage for files / blobs. Think: folders + files, not relational tables.",
+            "Where it fits",
+            "Raw landing → processed data → curated outputs. Useful for CSV, JSON, Parquet and other files.",
+            "Key idea",
+            "Separate storage from compute. Databricks can read/write files without being the permanent storage layer.",
+            "Blob container — illustrative snapshot",
+            "Example folder structure",
+            "raw/ sales/ 2026-08-31.csv curated/ sales/ sales_delta/",
+            "What to understand"
+          ],
+          note: ""
+        },
+        {
+          title: "Azure Data Factory (ADF) — The Orchestrator",
+          bullets: [
+            "Trigger",
+            "When should it run?",
+            "Copy / Lookup",
+            "Move or inspect data",
+            "Databricks",
+            "Transform at scale",
+            "Sink",
+            "Store output",
+            "Monitor",
+            "Observe success/failure"
+          ],
+          note: ""
+        },
+        {
+          title: "Azure Databricks — Transform at Scale",
+          bullets: [
+            "What it is",
+            "Lakehouse analytics platform built around Apache Spark. Commonly used for large-scale transformation.",
+            "What you write",
+            "Notebooks / Python / PySpark / SQL Read → transform → write Reusable jobs for production workloads.",
+            "Why freshers like it",
+            "Python + SQL + distributed processing. A bridge between software skills and data engineering.",
+            "PySpark example",
+            "Illustrative",
+            "df = spark.read.parquet(\"/mnt/raw/sales\") clean = (df.dropDuplicates([\"OrderId\"]) .filter(\"Amount > 0\")) clean.write.format(\"delta\").mode(\"append\")…",
+            "Concepts to learn next"
+          ],
+          note: ""
+        },
+        {
+          title: "Databricks Jobs & Scheduling",
+          bullets: [
+            "Job",
+            "Bundle notebook / task + compute + parameters",
+            "Schedule",
+            "Cron / recurring schedule / event-driven patterns",
+            "Run & Monitor",
+            "Retries logs duration success/failure",
+            "Two common patterns",
+            "Pattern A — Databricks owns the schedule",
+            "Simple recurring transformation that can run independently.",
+            "Pattern B — ADF orchestrates the job"
+          ],
+          note: ""
+        },
+        {
+          title: "GitHub — Version Control for Data Engineering",
+          bullets: [
+            "Why GitHub matters",
+            "History + collaboration + code review. Your pipeline code should be reproducible, not trapped in a laptop.",
+            "What lives in a repo",
+            "PySpark / Python SQL scripts ADF pipeline definitions / templates README + tests + config",
+            "Core workflow",
+            "Clone → branch → commit → pull request → review → merge",
+            "GitHub — illustrative snapshot",
+            "Repository view",
+            "etl-project/ ├─ databricks/ │ └─ sales_transform.py ├─ sql/ │ └─ checks.sql ├─ adf/ │ └─ pipeline.json └─ README.md",
+            "How it connects"
+          ],
+          note: ""
+        }
+      ]
+    },
+    {
+      id: "etl-e2e",
+      title: "End-to-end ETL",
+      slides: [
+        {
+          title: "End-to-End ETL Architecture",
+          bullets: [
+            "GitHub sits across the lifecycle: develop → review → deploy → version",
+            "Develop",
+            "Review",
+            "Deploy",
+            "Run",
+            "Monitor"
+          ],
+          note: ""
+        },
+        {
+          title: "How ADF + Databricks + GitHub Work Together",
+          bullets: [
+            "GitHub",
+            "Engineer commits PySpark / SQL changes",
+            "Deploy",
+            "Approved code reaches the target workspace",
+            "ADF",
+            "Pipeline passes parameters / triggers the workload",
+            "Job",
+            "Databricks runs transformation on compute",
+            "Output",
+            "Write curated data + checks"
+          ],
+          note: ""
+        }
+      ]
+    },
+    {
+      id: "etl-recap",
+      title: "ETL recap, hands-on & careers",
+      slides: [
+        {
+          title: "Building the puzzle: recap & hands-on",
+          bullets: [
+            "Exercise 1 — SQL",
+            "Create a sales query: filter by date join customer data aggregate by customer add a data-quality check",
+            "Exercise 2 — Databricks",
+            "Read a CSV / Parquet file → clean duplicates → add a derived column → write curated output.",
+            "Exercise 3 — ADF",
+            "Build: Trigger → Copy / Lookup → Databricks → success/failure. Parameterize the date.",
+            "Mini challenge: draw the architecture before opening any Azure screen.",
+            "✓ Can I explain ETL vs ELT?",
+            "✓ Can I write a clean SQL JOIN?",
+            "✓ Can I explain Blob vs SQL Server?"
+          ],
+          note: ""
+        },
+        {
+          title: "Where These Skills Can Take You",
+          bullets: [
+            "Data Engineer",
+            "SQL → ETL → ADF → Databricks / Spark → cloud architecture",
+            "Analytics Engineer",
+            "SQL → dimensional modeling → dbt / warehouse → BI",
+            "BI Developer",
+            "SQL → semantic models → Power BI → business storytelling",
+            "Platform / DevOps",
+            "Git → CI/CD → IaC → monitoring → cloud operations",
+            "Recommendation: build strong SQL + data fundamentals first, then specialize."
+          ],
+          note: ""
+        },
+        {
+          title: "Thank you!",
+          bullets: [
+            "Santoshini Panda",
+            "Santoshini.panda@ferguson.com",
+            "Start small. Build one pipeline. Understand every box.",
+            "Questions / Discussion",
+            "SQL Azure Blob ADF Databricks GitHub"
           ],
           note: ""
         }

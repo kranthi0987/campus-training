@@ -72,10 +72,13 @@ the QR code, if auto-detection picks the wrong network adapter), `DB_PATH` (defa
    `node scripts/reload-session.mjs day09-python`.
    Trainers can place their own checkpoints without touching the deck file: the session
    page has a **Quiz checkpoints** card (for sessions with a deck) listing every slide with
-   a box for how many questions to ask after it. *Save checkpoints* stores the map on the
+   a box for the question numbers to ask after it (`3, 7, 12`, numbered as in the question
+   list; a question can follow only one slide). *Save checkpoints* stores the picks on the
    session and replaces the deck's `askAfter` values wholesale; *Use deck defaults* goes
-   back to the authored ones. Questions are always consumed in list order, so reorder the
-   question list to decide which questions land in which block.
+   back to the authored ones. Picked questions run in their blocks, slide by slide; whatever
+   is not picked runs from the host screen at the end, in list order. Skipping a checkpoint
+   slide carries its questions to the next checkpoint. The question list on the same page
+   tags each picked question with its slide.
    The slides themselves are shown as pictures exported from the PowerPoint file
    (`public/decks/day09-python/slide-01.png` … `slide-16.png`, 1920×1080), so every image,
    layout and colour matches the original; the text in the deck file becomes the trainer's

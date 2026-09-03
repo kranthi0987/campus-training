@@ -182,7 +182,7 @@ export function createApi({ db, live, auth, decks, publicUrl }) {
   r.get('/api/sessions/:id', (req, res, params) => {
     const id = sessionId(params);
     const { session: s } = requireSession(req, id);
-    sendJson(res, 200, { session: { ...s, hasSlides: !!(s.slidesKey && decks.has(s.slidesKey)) }, questions: live.questions(id) });
+    sendJson(res, 200, { session: { ...s, hasSlides: !!(s.slidesKey && decks.has(s.slidesKey)) }, questions: live.listQuestions(id) });
   });
 
   r.put('/api/sessions/:id', async (req, res, params) => {
@@ -199,20 +199,30 @@ export function createApi({ db, live, auth, decks, publicUrl }) {
     const trainerEmails = user.role === 'admin' && b.trainerEmails !== undefined ? cleanEmails(b.trainerEmails) : s.trainerEmails;
     const reveal = b.reveal === undefined ? s.reveal : String(b.reveal);
     if (!['end', 'each'].includes(reveal)) throw new HttpError(400, 'reveal must be "end" or "each"');
-    // Quiz checkpoints: {"<slide index>": questions to ask after that slide}; null returns to the deck's own.
+    // Quiz checkpoints: {"<slide index>": [question ids to ask after that slide]}; null returns to the deck's own.
     let checkpoints = s.checkpoints;
     if (b.checkpoints !== undefined) {
       if (b.checkpoints === null) checkpoints = null;
       else {
-        if (typeof b.checkpoints !== 'object' || Array.isArray(b.checkpoints)) throw new HttpError(400, 'checkpoints must be an object of slide index to question count, or null');
+        if (typeof b.checkpoints !== 'object' || Array.isArray(b.checkpoints)) throw new HttpError(400, 'checkpoints must be an object of slide index to question ids, or null');
         const slides = flattenDeck(live.deckForSession({ ...s, checkpoints: null })).length;
-        const questionCount = live.questions(id).length;
+        const list = live.listQuestions(id);
+        const numberOf = new Map(list.map((q, i) => [q.id, i + 1]));
+        const used = new Map();
         checkpoints = {};
         for (const [k, v] of Object.entries(b.checkpoints)) {
-          const slide = Number(k), n = Number(v);
+          const slide = Number(k);
           if (!Number.isInteger(slide) || slide < 0 || slide >= slides) throw new HttpError(400, `No slide ${k} in this deck (it has ${slides})`);
-          if (!Number.isInteger(n) || n < 0 || n > Math.max(1, questionCount)) throw new HttpError(400, `Slide ${slide + 1}: questions must be between 0 and ${questionCount}`);
-          if (n > 0) checkpoints[slide] = n;
+          if (!Array.isArray(v)) throw new HttpError(400, `Slide ${slide + 1}: expected a list of question ids`);
+          const picks = [];
+          for (const raw of v) {
+            const qid = Number(raw);
+            if (!numberOf.has(qid)) throw new HttpError(400, `Slide ${slide + 1}: question ${raw} is not in this session`);
+            if (used.has(qid)) throw new HttpError(400, `Question ${numberOf.get(qid)} is listed for slide ${used.get(qid) + 1} and slide ${slide + 1}; a question can follow only one slide`);
+            used.set(qid, slide);
+            picks.push(qid);
+          }
+          if (picks.length) checkpoints[slide] = picks;
         }
       }
     }
@@ -258,7 +268,7 @@ export function createApi({ db, live, auth, decks, publicUrl }) {
     const q = cleanQuestion(await readBody(req));
     insertQuestions(db, id, [q], nextPosition(id));
     live.broadcast(id);
-    sendJson(res, 201, { questions: live.questions(id) });
+    sendJson(res, 201, { questions: live.listQuestions(id) });
   });
 
   r.post('/api/sessions/:id/questions/bulk', async (req, res, params) => {
@@ -268,7 +278,7 @@ export function createApi({ db, live, auth, decks, publicUrl }) {
     if (errors.length) return sendJson(res, 400, { error: 'Some blocks could not be read', errors });
     insertQuestions(db, id, questions, nextPosition(id));
     live.broadcast(id);
-    sendJson(res, 201, { added: questions.length, questions: live.questions(id) });
+    sendJson(res, 201, { added: questions.length, questions: live.listQuestions(id) });
   });
 
   r.post('/api/sessions/:id/questions/reorder', async (req, res, params) => {
@@ -278,7 +288,7 @@ export function createApi({ db, live, auth, decks, publicUrl }) {
     if (!Array.isArray(ids)) throw new HttpError(400, 'ids must be an array');
     const stmt = db.prepare('UPDATE questions SET position = ? WHERE id = ? AND session_id = ?');
     ids.forEach((qid, i) => stmt.run(i, Number(qid), id));
-    sendJson(res, 200, { questions: live.questions(id) });
+    sendJson(res, 200, { questions: live.listQuestions(id) });
   });
 
   r.put('/api/questions/:id', async (req, res, params) => {
@@ -301,7 +311,7 @@ export function createApi({ db, live, auth, decks, publicUrl }) {
     if (s.status === 'live') throw new HttpError(409, 'Cannot delete questions while the quiz is running');
     db.prepare('DELETE FROM questions WHERE id = ?').run(qid);
     db.prepare('DELETE FROM answers WHERE question_id = ?').run(qid);
-    sendJson(res, 200, { questions: live.questions(row.session_id) });
+    sendJson(res, 200, { questions: live.listQuestions(row.session_id) });
   });
 
   // ---- lifecycle ----------------------------------------------------------
