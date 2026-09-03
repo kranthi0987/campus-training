@@ -13,24 +13,28 @@ export default [
     module: 'Backend', title: 'Spring Boot',
     subtopics: 'Dependency Injection, Controllers, Services, API Gateway, Resilience',
     trainers: ['Syed Suhail', 'Saurav Sanyal'],
+    slidesKey: 'day11-spring-boot',
   },
   {
     key: 'day12-sql-mongodb', dayNo: 12, date: '2026-09-08', week: 'Week-3',
     module: 'Database', title: 'SQL (Azure SQL) & MongoDB',
     subtopics: 'SQL, Joins, Stored Procedures, NoSQL Concepts, Collections, CRUD',
     trainers: ['Dushanth (SQL)', 'Vishnu C (Mongo DB)'],
+    slidesKey: 'day12-sql-mongodb',
   },
   {
     key: 'day13-frontend', dayNo: 13, date: '2026-09-09', week: 'Week-3',
     module: 'Frontend', title: 'HTML, CSS, JavaScript & React',
     subtopics: 'Frontend Fundamentals, Components, State, Props, Hooks, Routing',
     trainers: ['Kaushik C (JS)', 'Prakash (React, HTML, CSS)'],
+    slidesKey: 'day13-frontend',
   },
   {
     key: 'day14-devops-etl', dayNo: 14, date: '2026-09-10', week: 'Week-3',
     module: 'DevOps & ETL', title: 'DevOps & ETL (Databricks)',
     subtopics: 'Git, Jenkins, Docker, Kubernetes, CI/CD Pipeline, Databricks',
     trainers: ['Vishnu C (DevOps)', 'Santoshini (ETL)'],
+    slidesKey: 'day14-devops-etl',
   },
   {
     key: 'day16-cloud', dayNo: 16, date: '2026-09-15', week: 'Week-4',
