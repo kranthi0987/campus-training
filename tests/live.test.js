@@ -1,12 +1,12 @@
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { openDb } from '../server/db.js';
+import { openTestDb } from '../server/db.js';
 import { Live, LiveError, POINTS_CORRECT } from '../server/live.js';
 import { insertQuestions } from '../server/seed/index.js';
 
 // Deterministic clock + timers so the state machine can be driven by hand.
 async function harness() {
-  const db = await openDb(':memory:');
+  const db = await openTestDb();
   let now = 1_000_000;
   const timers = [];
   const live = new Live(db, {

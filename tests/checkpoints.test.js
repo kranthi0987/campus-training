@@ -15,12 +15,12 @@ const call = async (path, { method = 'GET', body, token, asTrainer = true } = {}
 const post = (p, body) => call(p, { method: 'POST', body });
 
 before(async () => {
-  app = await createApp({ dbPath: ':memory:', publicUrl: 'http://quiz.test' });
+  app = await createApp({ test: true, publicUrl: 'http://quiz.test' });
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${app.server.address().port}`;
   cookie = (await fetch(base + '/api/trainer/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 't@example.com', password: 'Ferguson@2026' }) })).headers.get('set-cookie').split(';')[0];
 });
-after(() => { app.server.close(); app.live.timers.forEach((t) => { clearTimeout(t.question); clearTimeout(t.session); }); });
+after(async () => { await app.close(); });
 
 test('the Python deck carries the 15 document questions and five checkpoints of three', async () => {
   const s = (await call('/api/sessions')).data.sessions.find((x) => x.key === 'day09-python');

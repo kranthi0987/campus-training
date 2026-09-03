@@ -1,12 +1,12 @@
 // With reveal = 'end' (the default) nothing is revealed during the quiz; the review comes at the end.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { openDb } from '../server/db.js';
+import { openTestDb } from '../server/db.js';
 import { Live } from '../server/live.js';
 import { insertQuestions } from '../server/seed/index.js';
 
 async function setup(reveal) {
-  const db = await openDb(':memory:');
+  const db = await openTestDb();
   const live = new Live(db, { now: () => 5_000_000, setTimer: () => ({}), clearTimer: () => {} });
   await live.ready;
   await db.run(`INSERT INTO sessions (key, title, trainers, join_code, week, reveal) VALUES ('t', 'Test', '["Ada"]', 'ABC123', 'Week-3', ?)`, reveal);
@@ -70,7 +70,7 @@ test('reveal after each question still works when a trainer switches it on', asy
 });
 
 test('sessions without a slide deck get a content page built from their subtopics', async () => {
-  const db = await openDb(':memory:');
+  const db = await openTestDb();
   const live = new Live(db, { now: () => 1, setTimer: () => ({}), clearTimer: () => {} });
   await live.ready;
   await db.run(`INSERT INTO sessions (key, title, trainers, join_code, subtopics) VALUES ('p', 'Python', '["Ada"]', 'PY1234', 'Syntax, OOP, JSON Processing')`);

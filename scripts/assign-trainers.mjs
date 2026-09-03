@@ -1,8 +1,7 @@
 // Creates trainer accounts (default password, role trainer) for every email listed in
 // server/seed/schedule.js `trainerEmails`, assigns them to their sessions and refreshes the
 // session trainer names, in an existing database. Safe to re-run: existing accounts, roles and
-// passwords are left alone. Usage: node scripts/assign-trainers.mjs [sqlite path]
-// With DATABASE_URL set (and no path given) it works on Postgres.
+// passwords are left alone. Usage: DATABASE_URL=... node scripts/assign-trainers.mjs
 import { openDb } from '../server/db.js';
 import { Auth, DEFAULT_PASSWORD } from '../server/auth.js';
 import schedule from '../server/seed/schedule.js';
@@ -14,7 +13,7 @@ const KNOWN = {
 };
 const nameFor = (email) => KNOWN[email] || email.split('@')[0].split(/[._]/).map((p) => p[0].toUpperCase() + p.slice(1)).join(' ');
 
-const db = await openDb(process.argv[2] ? { file: process.argv[2] } : {});
+const db = await openDb();
 try {
   const auth = new Auth(db);
   let created = 0;
@@ -32,6 +31,5 @@ try {
     await db.run('UPDATE sessions SET trainer_emails = ?, trainers = ? WHERE id = ?', JSON.stringify(merged), JSON.stringify(s.trainers), row.id);
     console.log(`${s.key}: ${s.trainers.join(', ')} · ${merged.join(', ') || 'no accounts'}`);
   }
-  if (db.dialect === 'sqlite') await db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
   console.log(`${created} account${created === 1 ? '' : 's'} created`);
 } finally { await db.close(); }

@@ -16,11 +16,11 @@ const call = async (path, { method = 'GET', body, token, asTrainer = true } = {}
 };
 
 before(async () => {
-  app = await createApp({ dbPath: ':memory:', publicUrl: 'http://quiz.test' });
+  app = await createApp({ test: true, publicUrl: 'http://quiz.test' });
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${app.server.address().port}`;
 });
-after(() => { app.server.close(); app.live.timers.forEach((t) => { clearTimeout(t.question); clearTimeout(t.session); }); });
+after(async () => { await app.close(); });
 
 test('the schedule is seeded with question banks and a slide deck', () => {
   assert.equal(app.seeded.sessions, 8);

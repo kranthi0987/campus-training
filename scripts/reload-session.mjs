@@ -1,7 +1,7 @@
 // Replaces one session's questions with its bank file and re-links its slide deck, keeping the
 // session row, its code and settings. Use after editing server/seed/questions/<key>.js.
 // Usage: node scripts/reload-session.mjs <session key>   (stop the server first)
-// Works on the SQLite file, or on Postgres when DATABASE_URL is set.
+// Needs DATABASE_URL.
 import { openDb } from '../server/db.js';
 import { loadQuestionBank, insertQuestions } from '../server/seed/index.js';
 import schedule from '../server/seed/schedule.js';

@@ -17,26 +17,17 @@ services:
       # deploys and restarts; without it a fresh secret is generated on every start.
       - key: SESSION_SECRET
         generateValue: true
-      # The *internal* connection string of the Render Postgres database "campustraining",
-      # pasted in the dashboard (never committed). Without it the app would fall back to a
-      # SQLite file on the ephemeral disk and lose everything on the next deploy.
+      # Required: the *internal* connection string of the Render Postgres database
+      # "campustraining", pasted in the dashboard (never committed). The app refuses to start
+      # without it.
       - key: DATABASE_URL
         sync: false
       # PUBLIC_URL is taken from RENDER_EXTERNAL_URL automatically; set it here only
       # if you put a custom domain in front of the service.
       # - key: PUBLIC_URL
       #   value: https://quiz.example.com
-    # To keep data between restarts, move to a paid instance and uncomment:
-    # plan: starter
-    # disk:
-    #   name: data
-    #   mountPath: /var/data
-    #   sizeGB: 1
-    # envVars:
-    #   - key: DB_PATH
-    #     value: /var/data/daily-quiz.sqlite
 
 # The Postgres database (free plan, created by hand in the dashboard as "campustraining") is not
 # managed here so a Blueprint sync never recreates it. Free Postgres expires 30 days after
-# creation: create a new one before then and load it with scripts/migrate-sqlite-to-postgres.mjs
-# (from a pg_dump restore or the committed SQLite file).
+# creation: create a new one before then, copy the data across with
+# scripts/copy-database.mjs <old url> <new url>, then point DATABASE_URL at the new one.

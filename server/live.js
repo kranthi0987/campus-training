@@ -1,5 +1,5 @@
 // The session engine: lifecycle, timers, joins, answers, ratings, and the snapshot every
-// client renders from. All state lives in SQLite; timers live in memory and are re-armed
+// client renders from. All state lives in Postgres; timers live in memory and are re-armed
 // on startup so a server restart mid-quiz recovers.
 import { randomBytes } from 'node:crypto';
 import { rowToSession, rowToQuestion } from './db.js';
@@ -648,7 +648,7 @@ export class Live {
     this.clearQuestionTimer(s.id);
     if (s.status !== 'live' || s.questionClosed || !s.questionEndsAt) return;
     const t = this.timers.get(s.id) || {};
-    t.question = this.setTimer(() => { this.closeQuestion(s.id).catch(() => { /* session gone */ }); }, Math.max(0, s.questionEndsAt - this.now()));
+    t.question = this.setTimer(() => this.closeQuestion(s.id).catch(() => { /* session gone */ }), Math.max(0, s.questionEndsAt - this.now()));
     this.timers.set(s.id, t);
   }
 
@@ -656,7 +656,7 @@ export class Live {
     const t = this.timers.get(s.id) || {};
     if (t.session) this.clearTimer(t.session);
     if (s.status !== 'live' || !s.endsAt) return;
-    t.session = this.setTimer(() => { this.endQuiz(s.id).catch(() => { /* session gone */ }); }, Math.max(0, s.endsAt - this.now()));
+    t.session = this.setTimer(() => this.endQuiz(s.id).catch(() => { /* session gone */ }), Math.max(0, s.endsAt - this.now()));
     this.timers.set(s.id, t);
   }
 

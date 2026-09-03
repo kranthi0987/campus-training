@@ -6,12 +6,18 @@ also lets the trainer present slides and mirrors the current slide to every inte
 
 ## Run it
 
-Requirements: Node 22.5 or newer (Node 24 recommended). Nothing else to install on the interns' side.
+Requirements: Node 22.5 or newer (Node 24 recommended) and a Postgres database (the free
+Render Postgres works from anywhere; a local Postgres works too). Nothing to install on the
+interns' side.
 
 ```bash
 npm install
-npm start
+DATABASE_URL=postgresql://user:password@host/dbname npm start
 ```
+
+On the laptop, set `DATABASE_URL` once in the shell (or a `.env` you source) to the database's
+*external* connection string; the hosted service uses the *internal* one. The first start on
+an empty database seeds the sessions, question banks and roster.
 
 The console prints the address to share, for example:
 
@@ -27,12 +33,11 @@ Windows Firewall (private networks) or run once as administrator:
 netsh advfirewall firewall add rule name="Daily Quiz" dir=in action=allow protocol=TCP localport=3000
 ```
 
-Optional environment variables: `PORT` (default 3000), `PUBLIC_URL` (the address encoded in
-the QR code, if auto-detection picks the wrong network adapter), `DB_PATH` (default
-`data/daily-quiz.sqlite`), `DATABASE_URL` (a Postgres connection string; when set, the app uses
-Postgres instead of the SQLite file), `DEFAULT_TRAINER_PASSWORD` (default `Ferguson@2026`), `SESSION_SECRET`
-(signs trainer sign-in cookies; when unset a random one is kept in `data/.session-secret`, so
-sign-ins survive restarts either way).
+Environment variables: `PORT` (default 3000), `PUBLIC_URL` (the address encoded in
+the QR code, if auto-detection picks the wrong network adapter),
+`DATABASE_URL` (required: the Postgres connection string), `DEFAULT_TRAINER_PASSWORD` (default
+`Ferguson@2026`), `SESSION_SECRET` (signs trainer sign-in cookies; when unset a random one is
+kept in `data/.session-secret`, so sign-ins survive restarts either way).
 
 ## Running a session
 
@@ -149,17 +154,14 @@ no manual configuration.
 
 Free-tier limits to plan around:
 
-- **The hosted service runs on Render Postgres.** The instance disk is ephemeral (wiped on
-  deploy, restart and after 15 idle minutes), so the service's `DATABASE_URL` points at the
-  free Render Postgres database "campustraining" (set it to the database's *internal*
-  connection string in the dashboard). With `DATABASE_URL` set the app uses Postgres for
-  everything: accounts, sessions, questions, participants, answers, scores and ratings all
-  live there and survive any number of deploys. Without it (your laptop) the app uses the
-  SQLite file as before. Both backends run the same test suite. Free Postgres databases
-  expire 30 days after creation: create a new one before then and re-run the migration.
-  `scripts/migrate-sqlite-to-postgres.mjs <file> [--force]` copies a SQLite database into
-  the Postgres one (ids included); `scripts/reload-session.mjs` and
-  `scripts/assign-trainers.mjs` work on whichever backend `DATABASE_URL` selects.
+- **All data lives in Render Postgres.** The instance disk is ephemeral (wiped on deploy,
+  restart and after 15 idle minutes), so the service's `DATABASE_URL` must point at the free
+  Render Postgres database "campustraining" (set it to the database's *internal* connection
+  string in the dashboard). Accounts, sessions, questions, participants, answers, scores and
+  ratings all live there and survive any number of deploys. Without `DATABASE_URL` the app
+  refuses to start. Free Postgres databases expire 30 days after creation: create a new one
+  before then and run `node scripts/copy-database.mjs <old url> <new url>` to move everything,
+  then point `DATABASE_URL` at it.
 - **Sign-ins survive deploys.** `render.yaml` generates a `SESSION_SECRET` for the service; if
   the service was created before that line existed, add the variable once in the Render
   dashboard (any long random string). Without it every deploy signs all trainers out, and the
@@ -172,7 +174,7 @@ Free-tier limits to plan around:
 
 ```
 server/            Node server (no framework): http.js router, api.js routes, live.js session engine,
-                   db.js schema + the SQLite/Postgres adapters, auth.js accounts + roles, access.js session scoping,
+                   db.js Postgres schema + query helper, auth.js accounts + roles, access.js session scoping,
                    certificate.js + zip.js certificates, bulk.js paste parser
 server/seed/       schedule.js sessions; questions/<key>.js banks; slides/<key>.js decks
 public/            Pages: index (join), play, trainer, host, present + shared app.js / styles.css
@@ -185,10 +187,10 @@ design/            The Claude Design canvas the screens are built from
 docs/superpowers/  Design spec
 ```
 
-Seeding runs only when the database is empty, so trainer edits persist. To reload the
-banks from disk, stop the server and delete `data/daily-quiz.sqlite`.
+Seeding runs only when the database is empty, so trainer edits persist. To reload one
+session's bank from disk, run `node scripts/reload-session.mjs <key>`.
 
 ```bash
-npm test                    # engine, parser and HTTP tests
+TEST_DATABASE_URL=... npm test   # engine, parser and HTTP tests, each file in its own throwaway schema
 npm run validate:questions  # checks every question bank
 ```

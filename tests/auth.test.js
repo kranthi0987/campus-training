@@ -2,11 +2,11 @@
 // over the same database) and die with a password change, account removal or a different secret.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { openDb } from '../server/db.js';
+import { openTestDb } from '../server/db.js';
 import { Auth, DEFAULT_PASSWORD } from '../server/auth.js';
 
 const fresh = async (secret = 'unit-test-secret') => {
-  const db = await openDb(':memory:');
+  const db = await openTestDb();
   return { db, auth: new Auth(db, { secret }) };
 };
 
@@ -46,7 +46,7 @@ test('tampering, password changes and removal invalidate a token', async () => {
 });
 
 test('without an explicit secret each Auth gets its own random one', async () => {
-  const db = await openDb(':memory:');
+  const db = await openTestDb();
   const a = new Auth(db), b = new Auth(db);
   await a.create({ email: 'x@example.com', name: 'X', role: 'admin', password: DEFAULT_PASSWORD });
   const token = await a.issueToken('x@example.com');

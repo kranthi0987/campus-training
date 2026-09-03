@@ -1,11 +1,6 @@
-// Storage behind one small async interface with two backends: SQLite (Node's built-in driver,
-// one file per laptop, in-memory for tests) and Postgres (DATABASE_URL, the hosted service).
-// Every query is written once in the portable subset both understand; the adapters translate
-// placeholders, row ids and the schema's id/timestamp column types.
-import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync } from 'node:fs';
-import path from 'node:path';
-
+// Storage: Postgres, reached through DATABASE_URL, behind a small async interface
+// (get / all / run / exec / transaction). Queries are written with "?" placeholders and
+// translated here; INSERTs into the id tables hand back the new id as `lastInsertRowid`.
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS trainers (
   email TEXT PRIMARY KEY,
@@ -20,7 +15,7 @@ CREATE TABLE IF NOT EXISTS trainer_tokens (
   created_at BIGINT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS sessions (
-  id {{ID}},
+  id SERIAL PRIMARY KEY,
   key TEXT UNIQUE,
   day_no INTEGER,
   date TEXT,
@@ -51,7 +46,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   checkpoints TEXT
 );
 CREATE TABLE IF NOT EXISTS questions (
-  id {{ID}},
+  id SERIAL PRIMARY KEY,
   session_id INTEGER NOT NULL,
   position INTEGER NOT NULL,
   text TEXT NOT NULL,
@@ -64,7 +59,7 @@ CREATE TABLE IF NOT EXISTS questions (
 );
 CREATE INDEX IF NOT EXISTS questions_session ON questions(session_id, position);
 CREATE TABLE IF NOT EXISTS participants (
-  id {{ID}},
+  id SERIAL PRIMARY KEY,
   session_id INTEGER NOT NULL,
   token TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
@@ -100,38 +95,8 @@ CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
 `;
 
 /** Tables whose INSERT should hand back the new id (run() -> lastInsertRowid). */
-const ID_TABLES = ['sessions', 'questions', 'participants'];
-
-// ---- SQLite ---------------------------------------------------------------------------------
-
-export class SqliteDb {
-  constructor(file) {
-    if (file !== ':memory:') mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
-    this.raw = new DatabaseSync(file);
-    this.dialect = 'sqlite';
-    this.raw.exec('PRAGMA journal_mode = WAL;');
-    this.raw.exec('PRAGMA foreign_keys = ON;');
-  }
-
-  async get(sql, ...params) { return this.raw.prepare(sql).get(...params) ?? null; }
-  async all(sql, ...params) { return this.raw.prepare(sql).all(...params); }
-  async run(sql, ...params) {
-    const r = this.raw.prepare(sql).run(...params);
-    return { changes: Number(r.changes), lastInsertRowid: Number(r.lastInsertRowid) };
-  }
-  async exec(sql) { this.raw.exec(sql); }
-
-  /** fn runs inside BEGIN/COMMIT on this connection; any throw rolls back. */
-  async transaction(fn) {
-    this.raw.exec('BEGIN');
-    try { const out = await fn(this); this.raw.exec('COMMIT'); return out; } catch (err) { this.raw.exec('ROLLBACK'); throw err; }
-  }
-
-  async columns(table) { return this.raw.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name); }
-  async close() { this.raw.close(); }
-}
-
-// ---- Postgres -------------------------------------------------------------------------------
+export const ID_TABLES = ['sessions', 'questions', 'participants'];
+export const TABLES = ['trainers', 'trainer_tokens', 'sessions', 'questions', 'participants', 'answers', 'ratings', 'roster', 'meta'];
 
 /** "?" placeholders become $1..$n; INSERTs into id tables return the new id. */
 function toPostgres(sql) {
@@ -173,6 +138,7 @@ export class PostgresDb {
   }
   async exec(sql) { await this.pool.query(sql); }
 
+  /** fn runs inside BEGIN/COMMIT on one connection; any throw rolls back. */
   async transaction(fn) {
     if (this.owner) return fn(this); // already inside one
     const client = await this.pool.connect();
@@ -191,13 +157,22 @@ export class PostgresDb {
     return rows.map((r) => r.column_name);
   }
 
-  async close() { if (!this.owner) await this.pool.end(); }
+  async close() {
+    if (this.owner) return;
+    if (this.schema) await this.pool.query(`DROP SCHEMA IF EXISTS ${this.schema} CASCADE`).catch(() => {});
+    await this.pool.end();
+  }
 }
 
 /** Render's external hostnames need TLS; internal ones (no domain) do not offer it. */
 export function sslFor(url) { return /render\.com/i.test(url) ? { rejectUnauthorized: false } : undefined; }
 
-async function connectPostgres(url, { schema } = {}) {
+/**
+ * Opens the database at `url` (default DATABASE_URL), creates missing tables and columns.
+ * `schema` puts everything in a separate Postgres schema, which close() drops: used by tests.
+ */
+export async function openDb({ url = process.env.DATABASE_URL, schema = null } = {}) {
+  if (!url) throw new Error('DATABASE_URL is not set: point it at the Postgres database (see README).');
   const { default: pg } = await import('pg');
   // COUNT/SUM come back as int8 and AVG as numeric: strings by default, numbers here.
   pg.types.setTypeParser(20, (v) => Number(v));
@@ -208,21 +183,25 @@ async function connectPostgres(url, { schema } = {}) {
   });
   pool.on('error', (err) => console.error('  database: idle connection error:', err.message));
   if (schema) await pool.query(`CREATE SCHEMA IF NOT EXISTS ${schema}`);
-  return new PostgresDb(pool, { schema });
+  const db = new PostgresDb(pool, { schema });
+  await db.exec(SCHEMA);
+  await migrate(db);
+  return db;
 }
 
-// ---- open + migrate -------------------------------------------------------------------------
-
 /**
- * openDb() / openDb(':memory:') / openDb('data/x.sqlite') open SQLite; openDb({ url }) opens
- * Postgres (also picked when DATABASE_URL is set and no file is asked for explicitly).
+ * A throwaway schema for a test run, on TEST_DATABASE_URL or DATABASE_URL. close() drops it;
+ * schemas older than half an hour are leftovers of interrupted runs and are dropped on the way in.
  */
-export async function openDb(arg = {}) {
-  const opts = typeof arg === 'string' ? { file: arg } : arg;
-  const url = opts.url ?? (opts.file ? null : process.env.DATABASE_URL || null);
-  const db = url ? await connectPostgres(url, { schema: opts.schema }) : new SqliteDb(opts.file || process.env.DB_PATH || 'data/daily-quiz.sqlite');
-  await db.exec(SCHEMA.replace(/\{\{ID\}\}/g, db.dialect === 'postgres' ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'));
-  await migrate(db);
+export async function openTestDb() {
+  const url = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
+  if (!url) throw new Error('Tests need TEST_DATABASE_URL (or DATABASE_URL) pointing at a Postgres database.');
+  const db = await openDb({ url, schema: `test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` });
+  const cutoff = Date.now() - 30 * 60 * 1000;
+  for (const { nspname } of await db.all("SELECT nspname FROM pg_namespace WHERE nspname LIKE 'test_%'")) {
+    const stamp = Number(nspname.split('_')[1]);
+    if (stamp && stamp < cutoff) await db.exec(`DROP SCHEMA IF EXISTS ${nspname} CASCADE`).catch(() => {});
+  }
   return db;
 }
 

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-import { openDb } from './db.js';
+import { openDb, openTestDb } from './db.js';
 import { Auth } from './auth.js';
 import { Live, LiveError } from './live.js';
 import { seedIfEmpty, loadSlideDecks } from './seed/index.js';
@@ -38,10 +38,10 @@ export function lanAddress() {
  * in render.yaml), otherwise a random value kept in a file beside the database so restarts on
  * the trainer's laptop do not sign everyone out. In-memory databases (tests) get a throwaway one.
  */
-export function sessionSecret(dbPath = process.env.DB_PATH || 'data/daily-quiz.sqlite') {
+export function sessionSecret(dir = process.env.DATA_DIR || 'data') {
   if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
-  if (!dbPath || dbPath === ':memory:') return null;
-  const file = path.join(path.dirname(path.resolve(dbPath)), '.session-secret');
+  if (!dir) return null;
+  const file = path.join(path.resolve(dir), '.session-secret');
   try {
     if (existsSync(file)) return readFileSync(file, 'utf8').trim() || null;
     mkdirSync(path.dirname(file), { recursive: true });
@@ -52,29 +52,16 @@ export function sessionSecret(dbPath = process.env.DB_PATH || 'data/daily-quiz.s
 }
 
 /**
- * Which database to open. DATABASE_URL (Render Postgres) wins unless a SQLite file is asked for
- * explicitly. Tests ask for ':memory:'; with TEST_DATABASE_URL set they get their own throwaway
- * Postgres schema instead, so the same suite can run against both backends.
+ * `databaseUrl` defaults to DATABASE_URL. `test: true` opens a throwaway Postgres schema on
+ * TEST_DATABASE_URL (or DATABASE_URL) that close() drops, so test runs never touch real data.
  */
-function databaseFor({ dbPath, databaseUrl }) {
-  if (dbPath === ':memory:' && process.env.TEST_DATABASE_URL) {
-    return { url: process.env.TEST_DATABASE_URL, schema: `test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` };
-  }
-  if (databaseUrl) return { url: databaseUrl };
-  if (dbPath) return { file: dbPath };
-  if (process.env.DATABASE_URL) return { url: process.env.DATABASE_URL };
-  return { file: process.env.DB_PATH || 'data/daily-quiz.sqlite' };
-}
-
-export async function createApp({ dbPath, databaseUrl, publicUrl, secret } = {}) {
+export async function createApp({ databaseUrl, test = false, publicUrl, secret } = {}) {
   const log = (m) => console.log('  ' + m);
-  const target = databaseFor({ dbPath, databaseUrl });
-  const db = await openDb(target);
-  if (target.schema) await dropStaleTestSchemas(db);
-  log(db.dialect === 'postgres' ? `database: Postgres${target.schema ? ` (schema ${target.schema})` : ''}` : `database: SQLite ${target.file}`);
+  const db = test ? await openTestDb() : await openDb({ url: databaseUrl });
+  log(`database: Postgres${db.schema ? ` (schema ${db.schema})` : ''}`);
   const seeded = await seedIfEmpty(db, { log });
   const decks = await loadSlideDecks();
-  const auth = new Auth(db, { secret: secret || sessionSecret(target.file) });
+  const auth = new Auth(db, { secret: secret || (test ? null : sessionSecret()) });
   const live = new Live(db, { decks });
   await live.ready;
   const api = await createApi({ db, live, auth, decks, publicUrl: publicUrl || '' });
@@ -102,23 +89,13 @@ export async function createApp({ dbPath, databaseUrl, publicUrl, secret } = {})
     }
   });
 
-  /** Stops timers and the server and releases the database (drops a test schema). */
+  /** Stops timers and the server and releases the database (a test schema is dropped). */
   const close = async () => {
     live.timers.forEach((t) => { clearTimeout(t.question); clearTimeout(t.session); });
     await new Promise((r) => server.close(() => r()));
-    if (target.schema) await db.exec(`DROP SCHEMA IF EXISTS ${target.schema} CASCADE`);
     await db.close();
   };
   return { server, db, live, auth, decks, seeded, close, setPublicUrl: (u) => { api.publicUrl = u; } };
-}
-
-/** Test schemas older than half an hour are leftovers of interrupted runs. */
-async function dropStaleTestSchemas(db) {
-  const cutoff = Date.now() - 30 * 60 * 1000;
-  for (const { nspname } of await db.all("SELECT nspname FROM pg_namespace WHERE nspname LIKE 'test_%'")) {
-    const stamp = Number(nspname.split('_')[1]);
-    if (stamp && stamp < cutoff) await db.exec(`DROP SCHEMA IF EXISTS ${nspname} CASCADE`).catch(() => {});
-  }
 }
 
 // pathToFileURL handles both Windows drive paths and Linux absolute paths (a hand-built

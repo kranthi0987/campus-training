@@ -40,13 +40,13 @@ const call = async (path, { method = 'GET', body, token, asTrainer = true } = {}
 };
 
 before(async () => {
-  app = await createApp({ dbPath: ':memory:', publicUrl: 'http://quiz.test' });
+  app = await createApp({ test: true, publicUrl: 'http://quiz.test' });
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${app.server.address().port}`;
   const login = await call('/api/trainer/login', { method: 'POST', body: { email: 't@example.com', password: 'Ferguson@2026' } });
   cookie = login.res.headers.get('set-cookie').split(';')[0];
 });
-after(() => { app.server.close(); app.live.timers.forEach((t) => { clearTimeout(t.question); clearTimeout(t.session); }); });
+after(async () => { await app.close(); });
 
 test('presentation builds bullet by bullet, then moves to the next slide; back returns to the previous slide fully shown', async () => {
   const { data: { sessions } } = await call('/api/sessions');
@@ -73,7 +73,7 @@ test('presentation builds bullet by bullet, then moves to the next slide; back r
 test('dashboard, participant removal, clear-all and certificates', async () => {
   const { data: { sessions } } = await call('/api/sessions');
   const s = sessions.find((x) => x.key === 'day09-python');
-  await call(`/api/sessions/${s.id}`, { method: 'PUT', body: { easyS: 5, mediumS: 5, hardS: 5 } });
+  await call(`/api/sessions/${s.id}`, { method: 'PUT', body: { easyS: 30, mediumS: 30, hardS: 30 } });
   await call(`/api/sessions/${s.id}/lobby`, { method: 'POST' });
   await call('/api/roster', { method: 'POST', body: { entries: [{ name: 'Grace', email: 'grace@example.com' }, { name: 'Test User', email: 'test@example.com' }] } });
   const grace = (await call('/api/join', { method: 'POST', body: { code: s.joinCode, email: 'grace@example.com' }, asTrainer: false })).data;
