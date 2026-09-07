@@ -1,4 +1,4 @@
-import { $, $$, api, html, raw, connect, toast, ring, secondsLeft, initials } from '/app.js';
+import { $, $$, api, html, raw, connect, toast, ring, secondsLeft, initials, pdfjs } from '/app.js';
 import { renderDiagram } from '/diagrams.js';
 
 const id = Number(location.pathname.split('/').pop());
@@ -14,14 +14,73 @@ let showJoin = false;
 
 document.body.classList.add('training');
 
+// ---- PDF decks: pages drawn by pdf.js into the slide's canvas -----------------------------
+let pdfDoc = null;      // { url, promise }
+let pdfRender = null;   // the render task in flight, cancelled when the slide changes
+const pdfCache = new Map(); // "page@WxH" -> drawn canvas; every state update re-renders the page, this keeps it from blinking
+function pdfDocument() {
+  if (!deck?.file) return Promise.reject(new Error('No PDF for this deck'));
+  if (!pdfDoc || pdfDoc.url !== deck.file) pdfDoc = { url: deck.file, promise: pdfjs().then((lib) => lib.getDocument({ url: deck.file, withCredentials: true }).promise) };
+  return pdfDoc.promise;
+}
+async function drawPdfPage(pageNo) {
+  const canvas = $('#pdfCanvas');
+  if (!canvas) return;
+  const box = canvas.parentElement.getBoundingClientRect();
+  const key = `${deck.file}#${pageNo}@${Math.round(box.width)}x${Math.round(box.height)}`;
+  const hit = pdfCache.get(key);
+  if (hit) {
+    // Synchronous: the page is on screen before the browser paints.
+    canvas.width = hit.width; canvas.height = hit.height; canvas.style.width = hit.style.width; canvas.style.height = hit.style.height;
+    canvas.getContext('2d').drawImage(hit, 0, 0);
+    canvas.classList.add('ready');
+    return;
+  }
+  try {
+    const doc = await pdfDocument();
+    const page = await doc.getPage(pageNo);
+    const base = page.getViewport({ scale: 1 });
+    const fit = Math.max(0.1, Math.min((box.width - 8) / base.width, (box.height - 8) / base.height));
+    const dpr = window.devicePixelRatio || 1;
+    const viewport = page.getViewport({ scale: fit * dpr });
+    if ($('#pdfCanvas') !== canvas) return; // the slide changed while the page loaded
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    canvas.style.width = `${Math.floor(viewport.width / dpr)}px`;
+    canvas.style.height = `${Math.floor(viewport.height / dpr)}px`;
+    pdfRender?.cancel?.();
+    pdfRender = page.render({ canvasContext: canvas.getContext('2d'), viewport });
+    await pdfRender.promise;
+    canvas.classList.add('ready');
+    const copy = document.createElement('canvas');
+    copy.width = canvas.width; copy.height = canvas.height; copy.style.width = canvas.style.width; copy.style.height = canvas.style.height;
+    copy.getContext('2d').drawImage(canvas, 0, 0);
+    if (pdfCache.size > 12) pdfCache.delete(pdfCache.keys().next().value);
+    pdfCache.set(key, copy);
+    // Warm the next page so the projector never waits on the arrow key.
+    if (pageNo < doc.numPages) doc.getPage(pageNo + 1).catch(() => {});
+  } catch (err) {
+    if (err?.name === 'RenderingCancelledException') return;
+    const holder = canvas.parentElement;
+    if (holder) holder.innerHTML = html`<div class="pdf-error"><strong>This page could not be drawn.</strong><div class="small muted">${err.message}</div><a class="btn sm" href="${deck.file}" target="_blank">Open the PDF in a new tab</a></div>`.value;
+  }
+}
+window.addEventListener('resize', () => { const i = state?.session?.slideIndex; const sl = i >= 0 ? deck?.slides[i] : null; if (sl?.pdfPage) drawPdfPage(sl.pdfPage); });
+
 (async () => {
   try { await api('/api/trainer/me'); } catch { location.replace('/trainer'); return; }
   try { ({ publicUrl } = await api('/api/info')); } catch { /* optional */ }
   try { ({ deck } = await api(`/api/sessions/${id}/deck`)); }
   catch (e) { app.innerHTML = html`<div class="idle"><h1>${e.status === 403 ? 'Not available' : 'No slides for this session'}</h1><p class="muted">${e.message}</p></div>`.value; return; }
   let opening = false;
-  connect(`/api/sessions/${id}/events`, (snap) => {
+  let reloading = false;
+  connect(`/api/sessions/${id}/events`, async (snap) => {
     state = snap;
+    // The trainer edited, removed or replaced slides while this screen was open: fetch the deck again.
+    if (snap.deck?.rev && deck.rev && snap.deck.rev !== deck.rev && !reloading) {
+      reloading = true;
+      try { ({ deck } = await api(`/api/sessions/${id}/deck`)); pdfCache.clear(); pdfDoc = null; } catch { /* keep the old deck */ } finally { reloading = false; }
+    }
     // The opening screen shows the QR code, so the room must be open for interns to join.
     if (snap.session.status === 'draft' && !opening) { opening = true; api(`/api/sessions/${id}/lobby`, { method: 'POST' }).catch(() => {}); }
     render();
@@ -157,25 +216,33 @@ function render() {
     const newest = !changed && lastStep !== null && step > lastStep ? step - 1 : (changed ? -1 : -1);
     const bullet = (b, k) => html`<li class="${k < step ? (k === newest ? 'reveal' : '') : 'pending'}">${b}</li>`;
     let body;
+    const pics = sl.pictures || [];
     if (sl.image) {
       // The exported slide picture is the slide; the bullets are the trainer's talking points.
       body = html`<div class="picture"><img src="${sl.image}" alt="${sl.title}"></div>`;
+    } else if (sl.pdfPage) {
+      // A page of the uploaded PDF, drawn by pdf.js once the slide is on screen.
+      body = html`<div class="picture pdf"><canvas id="pdfCanvas" aria-label="${sl.title}"></canvas></div>`;
+    } else if (pics.length && !sl.bullets.length) {
+      // A picture-only slide from an uploaded PowerPoint: the picture is the content.
+      body = html`<div class="picture"><img src="${pics[0]}" alt="${sl.title}"></div>`;
     } else if (sl.agenda) {
       body = html`<div class="agenda" style="align-self: start;">
         ${sl.agenda.map((a, k) => html`<div class="item ${k < step ? (k === newest ? 'reveal' : '') : 'pending'}"><span class="n">${k + 1}</span><div><div class="t">${a.title}</div><div class="s">${a.first.join(' · ')}</div></div></div>`)}
       </div>`;
     } else {
-      body = html`<div class="body ${sl.diagram || sl.code ? '' : 'single'}">
+      body = html`<div class="body ${sl.diagram || sl.code || pics.length ? '' : 'single'} ${sl.bullets.length > 8 ? 'dense' : ''}">
         <ul class="bullets">${sl.bullets.map(bullet)}</ul>
-        ${sl.diagram ? raw(renderDiagram(sl.diagram)) : sl.code ? html`<pre class="code">${sl.code.text}</pre>` : ''}
+        ${sl.diagram ? raw(renderDiagram(sl.diagram)) : sl.code ? html`<pre class="code">${sl.code.text}</pre>` : pics.length ? html`<div class="pics">${pics.slice(0, 2).map((u) => html`<img src="${u}" alt="">`)}</div>` : ''}
       </div>`;
     }
+    const pictureSlide = !!(sl.image || sl.pdfPage);
     const joinBadge = html`<button class="joinbadge" data-join="1" title="Show the QR code and join code (J)">Join · <strong>${s.joinCode.slice(0, 3)} ${s.joinCode.slice(3)}</strong> · ${s.participantCount}</button>`;
-    main = html`<div class="slide ${changed ? 'slidein' : ''} ${sl.image ? 'has-picture' : ''}">
-      ${sl.image ? html`<div class="row between" style="align-items: baseline;"><div class="eyebrow">${sl.sectionTitle}</div><div class="row" style="gap: 12px;"><div class="tiny muted">${sl.title}</div>${joinBadge}</div></div>` : html`<div class="row between" style="align-items: baseline;"><div class="eyebrow">${sl.sectionTitle}</div>${joinBadge}</div><h1>${sl.title}</h1>`}
+    main = html`<div class="slide ${changed ? 'slidein' : ''} ${pictureSlide ? 'has-picture' : ''}">
+      ${pictureSlide ? html`<div class="row between" style="align-items: baseline;"><div class="eyebrow">${sl.sectionTitle}</div><div class="row" style="gap: 12px;"><div class="tiny muted">${sl.title}</div>${joinBadge}</div></div>` : html`<div class="row between" style="align-items: baseline;"><div class="eyebrow">${sl.sectionTitle}</div>${joinBadge}</div><h1>${sl.title}</h1>`}
       ${body}
-      ${showNotes && sl.image && sl.bullets.length ? html`<div class="notes" style="margin-top: 16px;"><strong style="color: var(--on-ink);">Points:</strong> ${sl.bullets.join(' · ')}</div>` : ''}
-      ${showNotes && sl.note ? html`<div class="notes" style="margin-top: ${sl.image ? 8 : 24}px;"><strong style="color: var(--on-ink);">Say:</strong> ${sl.note}</div>` : ''}
+      ${showNotes && pictureSlide && sl.bullets.length ? html`<div class="notes" style="margin-top: 16px;"><strong style="color: var(--on-ink);">Points:</strong> ${sl.bullets.join(' · ')}</div>` : ''}
+      ${showNotes && sl.note ? html`<div class="notes" style="margin-top: ${pictureSlide ? 8 : 24}px;"><strong style="color: var(--on-ink);">Say:</strong> ${sl.note}</div>` : ''}
       <div class="bar">
         <div class="row" style="gap: 8px;"><button class="btn sm" data-adv="-1" ${i === 0 && step === 0 ? 'disabled' : ''}>← Back</button>${step >= steps && s.pendingBlock ? html`<button class="btn sm primary" data-adv="1">Quiz: ${s.pendingBlock} question${s.pendingBlock === 1 ? '' : 's'} →</button>` : i >= total - 1 && step >= steps ? (s.askedCount < s.questionCount ? html`<a class="btn sm primary" href="/host/${s.id}">Content done · go to quiz →</a>` : html`<button class="btn sm primary" data-post="end">Finish session · show scoreboard →</button>`) : html`<button class="btn sm primary" data-adv="1">${step < steps ? 'Next point →' : 'Next slide →'}</button>`}<button class="btn sm ghost" data-jump="stop">Stop</button><button class="btn sm ghost" data-fs="1" title="Full screen (F)">⛶ Full screen</button></div>
         <div class="small muted">${i + 1} / ${total}${steps ? html` · point ${step} / ${steps}` : ''}${sl.askAfter ? html` · quiz after this slide` : ''} · ${s.askedCount ? `${s.askedCount} of ${s.questionCount} asked · ` : ''}${s.participantCount} following · <button class="btn sm ghost" id="notesBtn">${showNotes ? 'Hide' : 'Show'} notes</button></div>
@@ -197,6 +264,7 @@ function render() {
     post(b.dataset.post);
   }));
   $('#notesBtn')?.addEventListener('click', () => { showNotes = !showNotes; localStorage.setItem('dq_notes', showNotes ? '1' : '0'); render(); });
+  if (i >= 0 && deck.slides[i]?.pdfPage && s.status !== 'live') drawPdfPage(deck.slides[i].pdfPage);
   if (s.status === 'live' && state.question && !state.question.closed) {
     const q = state.question;
     tick = setInterval(() => { const r = $('.ring'); if (r) r.outerHTML = ring(secondsLeft(q.endsAt), q.seconds, { big: true }).value; }, 250);

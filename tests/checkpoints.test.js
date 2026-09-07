@@ -22,12 +22,24 @@ before(async () => {
 });
 after(async () => { await app.close(); });
 
-test('the Python deck carries the 15 document questions and five checkpoints of three', async () => {
+/** Maps the Python bank the way its deck was authored: three questions after each of slides 7-11. */
+async function mapPythonCheckpoints(s) {
+  const qs = (await call(`/api/sessions/${s.id}`)).data.questions;
+  const checkpoints = {};
+  for (let k = 0; k < 5; k++) checkpoints[6 + k] = qs.slice(k * 3, k * 3 + 3).map((q) => q.id);
+  const r = await call(`/api/sessions/${s.id}`, { method: 'PUT', body: { checkpoints } });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+}
+
+test('the Python deck carries the 15 document questions; nothing is asked mid-slides until the trainer maps questions', async () => {
   const s = (await call('/api/sessions')).data.sessions.find((x) => x.key === 'day09-python');
   assert.equal(s.questionCount, 15);
   assert.ok(s.hasSlides);
-  const { deck } = (await call(`/api/sessions/${s.id}/deck`)).data;
+  let { deck } = (await call(`/api/sessions/${s.id}/deck`)).data;
   assert.equal(deck.slides.length, 16, 'one slide per pptx slide, no auto agenda added');
+  assert.equal(deck.slides.filter((sl) => sl.askAfter).length, 0, "the deck file's own askAfter hints are not checkpoints");
+  await mapPythonCheckpoints(s);
+  ({ deck } = (await call(`/api/sessions/${s.id}/deck`)).data);
   const checkpoints = deck.slides.map((sl, i) => [i + 1, sl.askAfter || 0]).filter(([, n]) => n);
   assert.deepEqual(checkpoints, [[7, 3], [8, 3], [9, 3], [10, 3], [11, 3]]);
   const qs = (await call(`/api/sessions/${s.id}`)).data.questions;
@@ -69,11 +81,15 @@ test('advancing past a checkpoint slide runs a three-question block, then return
   assert.equal(mine.slide.index, 7, 'phones follow back to the slide');
   assert.equal(mine.me.score, null, 'scores stay hidden between blocks');
 
-  // Skipping ahead: the next checkpoint asks the next three questions regardless of which slide.
-  st = (await post(`/api/sessions/${s.id}/slide`, { index: 7, step: 'all' })).data.state;
+  // A slide with nothing mapped asks nothing; skipping past slide 8's checkpoint carries its
+  // three questions into slide 9's block, which then asks six.
+  st = (await post(`/api/sessions/${s.id}/slide`, { index: 11, step: 'all' })).data.state;
+  assert.equal(st.session.pendingBlock, 0, 'slide 12 has no questions mapped');
+  st = (await post(`/api/sessions/${s.id}/slide`, { index: 8, step: 'all' })).data.state;
+  assert.equal(st.session.pendingBlock, 6, 'slide 9 asks its three plus the three skipped on slide 8');
   st = (await post(`/api/sessions/${s.id}/advance`, { dir: 1 })).data.state;
   assert.equal(st.question.index, 3);
-  assert.equal(st.session.blockEnd, 5);
+  assert.equal(st.session.blockEnd, 8);
   await post(`/api/sessions/${s.id}/end`);
   const host = (await call(`/api/sessions/${s.id}/state`)).data.state;
   assert.equal(host.session.status, 'ended');
@@ -85,6 +101,7 @@ test('advancing past a checkpoint slide runs a three-question block, then return
 test('after blocks, Start quiz from the host runs only the remaining questions', async () => {
   const s = (await call('/api/sessions')).data.sessions.find((x) => x.key === 'day09-python');
   await call(`/api/sessions/${s.id}`, { method: 'PUT', body: { easyS: 5, mediumS: 5, hardS: 5 } });
+  await mapPythonCheckpoints(s);
   await post(`/api/sessions/${s.id}/lobby`);
   await post(`/api/sessions/${s.id}/slide`, { index: 6, step: 'all' });
   await post(`/api/sessions/${s.id}/advance`, { dir: 1 });
@@ -100,7 +117,7 @@ test('after blocks, Start quiz from the host runs only the remaining questions',
 });
 
 test('a trainer can pick which questions follow which slide, and go back to the deck defaults', async () => {
-  const s = (await call('/api/sessions')).data.sessions.find((x) => x.key === 'day14-devops-etl');
+  const s = (await call('/api/sessions')).data.sessions.find((x) => x.key === 'day14-devops');
   assert.ok(s.hasSlides);
   assert.equal(s.checkpoints, null, 'deck defaults until the trainer sets some');
   let { deck } = (await call(`/api/sessions/${s.id}/deck`)).data;
@@ -162,20 +179,21 @@ test('a trainer can pick which questions follow which slide, and go back to the 
   ({ deck } = (await call(`/api/sessions/${s.id}/deck`)).data);
   assert.deepEqual(deck.slides.map((sl, i) => [i, sl.askAfter || 0]).filter(([, n]) => n), [[3, 1], [16, 1]]);
 
-  // null = back to the deck as authored.
+  // null = nothing mapped: the whole quiz runs at the end.
   r = await call(`/api/sessions/${s.id}`, { method: 'PUT', body: { checkpoints: null } });
   assert.equal(r.data.session.checkpoints, null);
   ({ deck } = (await call(`/api/sessions/${s.id}/deck`)).data);
   assert.equal(deck.slides.filter((sl) => sl.askAfter).length, 0);
 });
 
-test("a custom checkpoint map overrides the Python deck's authored ones wholesale", async () => {
+test('a checkpoint map replaces the previous one wholesale', async () => {
   const s = (await call('/api/sessions')).data.sessions.find((x) => x.key === 'day09-python');
+  await mapPythonCheckpoints(s);
   const list = (await call(`/api/sessions/${s.id}`)).data.questions;
   const r = await call(`/api/sessions/${s.id}`, { method: 'PUT', body: { checkpoints: { 12: list.map((x) => x.id) } } });
   assert.equal(r.status, 200);
   const { deck } = (await call(`/api/sessions/${s.id}/deck`)).data;
-  assert.deepEqual(deck.slides.map((sl, i) => [i, sl.askAfter || 0]).filter(([, n]) => n), [[12, 15]], 'authored slides 7-11 no longer ask');
+  assert.deepEqual(deck.slides.map((sl, i) => [i, sl.askAfter || 0]).filter(([, n]) => n), [[12, 15]], 'slides 7-11 no longer ask');
   await call(`/api/sessions/${s.id}`, { method: 'PUT', body: { checkpoints: null } });
 });
 

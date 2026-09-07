@@ -36,7 +36,7 @@ test('showing a slide on a draft session opens the lobby so interns can join', a
 });
 
 test('the opening screen can be shown with the lobby open and nobody on a slide yet', async () => {
-  const s = (await call('/api/sessions')).data.sessions.find((x) => x.key === 'day12-sql-mongodb');
+  const s = (await call('/api/sessions')).data.sessions.find((x) => x.key === 'day12-sql');
   const st = (await call(`/api/sessions/${s.id}/lobby`, { method: 'POST' })).data.state;
   assert.equal(st.session.status, 'lobby');
   assert.equal(st.session.slideIndex, -1, 'join screen: no slide selected');

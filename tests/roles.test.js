@@ -55,7 +55,7 @@ test('a trainer only sees and touches their own sessions', async () => {
   const mine = (await call('/api/sessions', { as: 'sub' })).data.sessions;
   assert.deepEqual(mine.map((s) => s.key), ['day09-python']);
   const all = (await call('/api/sessions')).data.sessions;
-  assert.equal(all.length, 8, 'the admin sees everything');
+  assert.equal(all.length, 14, 'the admin sees everything');
   const other = all.find((s) => s.key === 'day11-spring-boot');
 
   assert.equal((await call(`/api/sessions/${other.id}`, { as: 'sub' })).status, 403);
@@ -68,7 +68,10 @@ test('a trainer only sees and touches their own sessions', async () => {
   const q = (await call(`/api/sessions/${other.id}`)).data.questions[0];
   assert.equal((await call(`/api/questions/${q.id}`, { method: 'DELETE', as: 'sub' })).status, 403);
   assert.equal((await call(`/api/questions/${q.id}`, { method: 'PUT', body: q, as: 'sub' })).status, 403);
-  for (const p of ['/api/dashboard', '/api/trainers']) assert.equal((await call(p, { as: 'sub' })).status, 403, p);
+  assert.equal((await call('/api/trainers', { as: 'sub' })).status, 403);
+  const scoped = await call('/api/dashboard', { as: 'sub' });
+  assert.equal(scoped.status, 200, 'scorecards are open to trainers, limited to their sessions');
+  assert.deepEqual(scoped.data.sessions.map((s) => s.key), ['day09-python']);
   assert.equal((await call('/api/admin/clear-data', { method: 'POST', body: { confirm: 'CLEAR' }, as: 'sub' })).status, 403);
   assert.equal((await call('/api/interns?email=x@example.com', { method: 'DELETE', as: 'sub' })).status, 403);
   assert.equal((await call('/api/roster', { method: 'POST', body: { text: 'A, a@example.com' }, as: 'sub' })).status, 403);
@@ -143,7 +146,7 @@ test('account guards: no self-removal, keep one admin, removal revokes access', 
   assert.equal((await call('/api/trainer/me', { as: 'other' })).status, 401, 'a password reset signs the account out');
   assert.equal((await login('other', 'other@example.com', 'Ferguson@2026')).status, 401);
   assert.equal((await login('other', 'other@example.com', 'NewPass!123')).status, 200);
-  assert.equal((await call('/api/sessions', { as: 'other' })).data.sessions.length, 9, 'admins see every session');
+  assert.equal((await call('/api/sessions', { as: 'other' })).data.sessions.length, 15, 'admins see every session');
   assert.equal((await call('/api/dashboard', { as: 'other' })).status, 200);
 
   assert.equal((await call('/api/trainers/other@example.com', { method: 'PUT', body: { role: 'trainer' } })).status, 200, 'demoting is fine while another admin remains');

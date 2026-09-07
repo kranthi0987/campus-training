@@ -1,5 +1,6 @@
 // Copies everything from one Postgres database to another, ids included: trainer accounts,
-// sessions (codes, settings, checkpoints), questions, participants, answers, ratings, roster.
+// sessions (codes, settings, checkpoints), questions, participants, answers, ratings, roster,
+// uploaded slide decks and their pictures.
 // Use it when the free Render database expires and a new one takes its place.
 //   node scripts/copy-database.mjs <source url> <destination url> [--force]
 // Refuses to touch a destination that already holds sessions unless --force empties it first.

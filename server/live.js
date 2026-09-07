@@ -2,8 +2,10 @@
 // client renders from. All state lives in Postgres; timers live in memory and are re-armed
 // on startup so a server restart mid-quiz recovers.
 import { randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { rowToSession, rowToQuestion } from './db.js';
 import { normalizeCode } from './seed/index.js';
+import { DeckStore } from './decks.js';
 
 export const POINTS_CORRECT = 100;
 export const POINTS_WRONG = 0;
@@ -20,6 +22,8 @@ export class Live {
   constructor(db, { decks = new Map(), now = () => Date.now(), setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
     this.db = db;
     this.decks = decks;
+    this.deckStore = new DeckStore(db);
+    this.uploads = new Map(); // sessionId -> uploaded deck | null (snapshots read the deck on every broadcast)
     this.now = now;
     this.setTimer = setTimer;
     this.clearTimer = clearTimer;
@@ -129,10 +133,36 @@ export class Live {
     return { removed: changes };
   }
 
-  /** The deck to present: the seeded slides, or a content page built from the session's subtopics. */
+  /** The deck a trainer uploaded for the session (cached), or null. */
+  async uploadedDeck(sessionId) {
+    if (!this.uploads.has(sessionId)) this.uploads.set(sessionId, await this.deckStore.deck(sessionId));
+    return this.uploads.get(sessionId);
+  }
+
+  /** Forget the cached upload after an upload, rename or removal. */
+  forgetUpload(sessionId) { this.uploads.delete(sessionId); }
+
+  /**
+   * The deck to present: the trainer's upload, else the seeded slides, else a content page
+   * built from the session's subtopics; with the session's slide edits (hidden slides dropped,
+   * edited text applied) and its quiz checkpoints.
+   */
   async deckForSession(s) {
+    return applyCheckpoints(applySlideEdits(await this.baseDeckForSession(s), s.slideEdits), await this.effectiveCheckpoints(s));
+  }
+
+  /** A short tag that changes whenever the deck a session presents changes (upload, edits, seed). */
+  async deckRevision(s) {
+    const uploaded = await this.uploadedDeck(s.id);
+    return createHash('sha1').update(`${uploaded ? uploaded.uploadedAt : s.slidesKey || ''}|${JSON.stringify(s.slideEdits || null)}`).digest('hex').slice(0, 10);
+  }
+
+  /** The deck before the session's edits: what slide edits index into. */
+  async baseDeckForSession(s) {
+    const uploaded = await this.uploadedDeck(s.id);
+    if (uploaded) return uploaded;
     const real = s.slidesKey ? this.decks.get(s.slidesKey) : null;
-    if (real) return applyCheckpoints(real, await this.effectiveCheckpoints(s));
+    if (real) return real;
     const topics = String(s.subtopics || '').split(',').map((t) => t.trim()).filter(Boolean);
     return {
       key: `session-${s.id}`, title: s.title, synthetic: true,
@@ -191,8 +221,74 @@ export class Live {
         return { trainer: t, average: row ? Math.round(row.avg * 10) / 10 : null, count: row ? row.n : 0 };
       }),
       comments,
+      rows: await this.ratingRows(sessionId),
+      participantCount: (await this.db.get('SELECT COUNT(*) AS n FROM participants WHERE session_id = ?', sessionId)).n,
     };
   }
+
+  /** One row per intern who rated: the stars they gave each trainer and their comment. */
+  async ratingRows(sessionId) {
+    const rows = await this.db.all(
+      `SELECT r.participant_id, p.name, p.email, r.trainer, r.stars, r.comment, r.created_at
+         FROM ratings r JOIN participants p ON p.id = r.participant_id
+        WHERE r.session_id = ? ORDER BY r.created_at, r.participant_id`, sessionId,
+    );
+    const byIntern = new Map();
+    for (const r of rows) {
+      if (!byIntern.has(r.participant_id)) byIntern.set(r.participant_id, { participantId: r.participant_id, name: r.name, email: r.email, stars: {}, comment: '', at: r.created_at });
+      const it = byIntern.get(r.participant_id);
+      it.stars[r.trainer] = r.stars;
+      if (r.comment) it.comment = r.comment;
+    }
+    return [...byIntern.values()];
+  }
+
+  /**
+   * Ratings across sessions: each trainer's average and count, and per session who gave what.
+   * `sessionIds` (a Set) limits the report to the sessions a trainer may see; null = all.
+   */
+  async reviews({ sessionIds = null } = {}) {
+    const all = (await this.db.all('SELECT * FROM sessions ORDER BY date, day_no, id')).map(rowToSession)
+      .filter((x) => !sessionIds || sessionIds.has(x.id));
+    // Two round trips for the whole report: participant counts, and every rating with its intern.
+    const counts = new Map((await this.db.all('SELECT session_id, COUNT(*) AS n FROM participants GROUP BY session_id')).map((r) => [r.session_id, r.n]));
+    const ratings = await this.db.all(
+      `SELECT r.session_id, r.participant_id, p.name, p.email, r.trainer, r.stars, r.comment, r.created_at
+         FROM ratings r JOIN participants p ON p.id = r.participant_id ORDER BY r.created_at, r.participant_id`,
+    );
+    const bySession = new Map();
+    for (const r of ratings) {
+      if (!bySession.has(r.session_id)) bySession.set(r.session_id, new Map());
+      const interns = bySession.get(r.session_id);
+      if (!interns.has(r.participant_id)) interns.set(r.participant_id, { participantId: r.participant_id, name: r.name, email: r.email, stars: {}, comment: '', at: r.created_at });
+      const it = interns.get(r.participant_id);
+      it.stars[r.trainer] = r.stars;
+      if (r.comment) it.comment = r.comment;
+    }
+    const sessions = [];
+    const byTrainer = new Map();
+    for (const x of all) {
+      const rows = [...(bySession.get(x.id)?.values() || [])];
+      const trainers = x.trainers.map((t) => {
+        const given = rows.map((r) => r.stars[t]).filter((n) => n);
+        return { trainer: t, average: given.length ? Math.round((given.reduce((p, n) => p + n, 0) / given.length) * 10) / 10 : null, count: given.length };
+      });
+      sessions.push({
+        id: x.id, key: x.key, dayNo: x.dayNo, date: x.date, module: x.module, title: x.title, status: x.status, trainerNames: x.trainers,
+        participantCount: counts.get(x.id) || 0, ratedCount: rows.length, trainers, rows,
+      });
+      for (const t of trainers) {
+        if (!byTrainer.has(t.trainer)) byTrainer.set(t.trainer, { trainer: t.trainer, sum: 0, count: 0, sessions: 0, rated: 0 });
+        const agg = byTrainer.get(t.trainer);
+        agg.sessions += 1;
+        if (t.count) { agg.sum += t.average * t.count; agg.count += t.count; agg.rated += 1; }
+      }
+    }
+    const trainers = [...byTrainer.values()].map((a) => ({ trainer: a.trainer, average: a.count ? Math.round((a.sum / a.count) * 10) / 10 : null, count: a.count, sessions: a.sessions, ratedSessions: a.rated }))
+      .sort((a, b) => (b.average ?? -1) - (a.average ?? -1) || b.count - a.count || a.trainer.localeCompare(b.trainer));
+    return { trainers, sessions };
+  }
+
 
   // ---- snapshot ----------------------------------------------------------
 
@@ -237,14 +333,14 @@ export class Live {
     const deck = await this.deckForSession(s);
     if (deck) {
       const flat = flattenDeck(deck);
-      out.deck = { title: deck.title, total: flat.length, synthetic: !!deck.synthetic, sections: deck.sections.map((sec) => ({ id: sec.id, title: sec.title, count: sec.slides.length })) };
+      out.deck = { title: deck.title, total: flat.length, synthetic: !!deck.synthetic, kind: deck.kind || (deck.synthetic ? 'content' : 'seed'), file: deck.file || null, rev: await this.deckRevision(s), sections: deck.sections.map((sec) => ({ id: sec.id, title: sec.title, count: sec.slides.length })) };
       if (s.slideIndex >= 0 && s.slideIndex < flat.length) {
         const sl = flat[s.slideIndex];
         out.slide = {
           index: s.slideIndex, total: flat.length, step: Math.min(s.slideStep, stepsOf(sl)), steps: stepsOf(sl),
           sectionId: sl.sectionId, sectionTitle: sl.sectionTitle, title: sl.title, bullets: sl.bullets,
           code: sl.code || null, diagram: sl.diagram || null, agenda: sl.agenda || null, askAfter: sl.askAfter || 0,
-          image: sl.image || null,
+          image: sl.image || null, pictures: sl.pictures || [], pdfPage: sl.pdfPage || null,
         };
         if (host) out.slide.note = sl.note || '';
       }
@@ -376,15 +472,19 @@ export class Live {
     return await this.snapshot(id, { host: true });
   }
 
-  /** How many questions a checkpoint on the current slide would ask (0 = none, or none left). */
+  /**
+   * How many questions the checkpoint on the current slide would ask (0 = the slide has none
+   * mapped, or nothing is left). The asked order lists every mapped question slide by slide,
+   * so a block runs up to the end of this slide's picks: exactly its own questions, plus those
+   * of an earlier checkpoint the trainer skipped past.
+   */
   async pendingBlock(s) {
-    const deck = await this.deckForSession(s);
-    if (!deck || s.slideIndex < 0) return 0;
-    const sl = flattenDeck(deck)[s.slideIndex];
-    const n = sl?.askAfter | 0;
-    if (!n) return 0;
-    const left = (await this.questions(s.id)).length - (s.currentIndex + 1);
-    return Math.max(0, Math.min(n, left));
+    if (s.slideIndex < 0) return 0;
+    const cps = await this.effectiveCheckpoints(s);
+    if (!cps || !cps[s.slideIndex]?.length) return 0;
+    const end = Object.keys(cps).map(Number).filter((k) => k <= s.slideIndex).reduce((a, k) => a + cps[k].length, 0);
+    const total = (await this.questions(s.id)).length;
+    return Math.max(0, Math.min(end, total) - (s.currentIndex + 1));
   }
 
   async startQuestion(id, index) {
@@ -498,6 +598,25 @@ export class Live {
     return { removed: 1 };
   }
 
+  /** Removes a session and everything hanging off it. Refused while its quiz is running. */
+  async deleteSession(id) {
+    const s = await this.mustSession(id);
+    if (s.status === 'live') throw new LiveError(409, 'Finish or reset the quiz before deleting the session');
+    this.clearTimers(id);
+    await this.db.transaction(async (tx) => {
+      await tx.run('DELETE FROM answers WHERE participant_id IN (SELECT id FROM participants WHERE session_id = ?)', id);
+      await tx.run('DELETE FROM ratings WHERE session_id = ?', id);
+      await tx.run('DELETE FROM participants WHERE session_id = ?', id);
+      await tx.run('DELETE FROM questions WHERE session_id = ?', id);
+      await tx.run('DELETE FROM deck_media WHERE session_id = ?', id);
+      await tx.run('DELETE FROM session_decks WHERE session_id = ?', id);
+      await tx.run('DELETE FROM sessions WHERE id = ?', id);
+    });
+    this.forgetUpload(id);
+    this.subs.delete(id);
+    return { deleted: true };
+  }
+
   /** Removes one intern (by email) from every session. */
   async removeIntern(emailRaw) {
     const email = String(emailRaw || '').trim().toLowerCase();
@@ -515,15 +634,17 @@ export class Live {
   }
 
   /** Points per intern per session, for the trainer dashboard. */
-  async dashboard() {
+  /** `sessionIds` (a Set) limits the scorecards to the sessions a trainer may see; null = every session. */
+  async dashboard({ sessionIds = null } = {}) {
     const sessions = (await this.db.all(`SELECT s.*, (SELECT COUNT(*) FROM questions q WHERE q.session_id = s.id) AS question_count,
               (SELECT COUNT(*) FROM participants p WHERE p.session_id = s.id) AS participant_count,
               (SELECT AVG(p.score) FROM participants p WHERE p.session_id = s.id) AS avg_score
-         FROM sessions s ORDER BY s.date, s.day_no, s.id`,)).map((r) => ({ ...rowToSession(r), questionCount: r.question_count, participantCount: r.participant_count, avgScore: r.avg_score === null ? null : Math.round(r.avg_score) }));
+         FROM sessions s ORDER BY s.date, s.day_no, s.id`,)).map((r) => ({ ...rowToSession(r), questionCount: r.question_count, participantCount: r.participant_count, avgScore: r.avg_score === null ? null : Math.round(r.avg_score) }))
+      .filter((x) => !sessionIds || sessionIds.has(x.id));
     const rows = (await this.db.all(`SELECT p.id, p.session_id, p.email, p.name, p.score, p.joined_at,
               COALESCE(SUM(a.correct), 0) AS correct, COUNT(a.question_id) AS answered
          FROM participants p LEFT JOIN answers a ON a.participant_id = p.id
-        GROUP BY p.id ORDER BY p.joined_at`,));
+        GROUP BY p.id ORDER BY p.joined_at`,)).filter((r) => !sessionIds || sessionIds.has(r.session_id));
     const weekOf = new Map(sessions.map((s) => [s.id, s.week || 'Unscheduled']));
     const weeks = [...new Set(sessions.map((s) => s.week || 'Unscheduled'))];
     const interns = new Map();
@@ -692,8 +813,50 @@ export function stepsOf(sl) {
  * values wholesale: each listed slide asks as many questions as it has picks. null keeps the deck
  * as authored.
  */
+/**
+ * The session's slide edits on top of a deck: every slide gets its `baseIndex` (its position in
+ * the deck before edits), hidden slides are dropped, and edited title / bullets / note replace
+ * the deck's. A hidden agenda slide's section simply loses it; an empty section is dropped.
+ */
+export function applySlideEdits(deck, edits) {
+  const hidden = new Set(edits?.hidden || []);
+  const map = edits?.edits || {};
+  let flat = 0;
+  const sections = (deck.sections || []).map((sec) => ({
+    ...sec,
+    slides: (sec.slides || []).map((sl) => {
+      const baseIndex = flat++;
+      if (hidden.has(baseIndex)) return null;
+      const e = map[baseIndex];
+      return e ? { ...sl, ...e, baseIndex, edited: true } : { ...sl, baseIndex };
+    }).filter(Boolean),
+  })).filter((sec) => sec.slides.length);
+  return { ...deck, sections, hiddenCount: hidden.size };
+}
+
+/** Checkpoint keys are indexes into the presented deck; hiding slide `at` shifts the ones after it. */
+export function checkpointsAfterHide(checkpoints, at, newLength) {
+  if (!checkpoints) return null;
+  const out = {};
+  for (const [k, ids] of Object.entries(checkpoints)) {
+    const i = Number(k);
+    const to = i < at ? i : i === at ? Math.min(Math.max(0, at - 1), Math.max(0, newLength - 1)) : i - 1;
+    if (newLength <= 0) continue;
+    out[to] = [...(out[to] || []), ...ids];
+  }
+  return out;
+}
+
+/** The inverse: a slide reappears at presented index `at`, everything from there moves up. */
+export function checkpointsAfterRestore(checkpoints, at) {
+  if (!checkpoints) return null;
+  const out = {};
+  for (const [k, ids] of Object.entries(checkpoints)) { const i = Number(k); out[i >= at ? i + 1 : i] = ids; }
+  return out;
+}
+
 export function applyCheckpoints(deck, checkpoints) {
-  if (!checkpoints || typeof checkpoints !== 'object') return deck;
+  if (!checkpoints || typeof checkpoints !== 'object') checkpoints = {};
   let flat = 0;
   return {
     ...deck,

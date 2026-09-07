@@ -21,7 +21,7 @@ for (const file of files) {
     problems.push(`cannot import: ${e.message}`);
   }
   if (Array.isArray(list)) {
-    if (list.length < 12 || list.length > 30) problems.push(`has ${list.length} questions; need 12–30`);
+    if (list.length < 3 || list.length > 30) problems.push(`has ${list.length} questions; need 3–30 (a trainer's part of a day may be small)`);
     const seen = new Set();
     const positions = [0, 0, 0, 0];
     const byComplexity = { easy: 0, medium: 0, hard: 0 };
@@ -47,7 +47,9 @@ for (const file of files) {
     const max = Math.max(...positions), min = Math.min(...positions);
     const warnings = [];
     if (list.length && max - min > Math.ceil(list.length / 3)) warnings.push(`correct answers unevenly spread across positions A–D: ${positions.join('/')}`);
-    if (list.length && (byComplexity.easy < 3 || byComplexity.medium < 3 || byComplexity.hard < 3)) problems.push(`complexity mix too thin: ${JSON.stringify(byComplexity)}`);
+    // A full day bank needs three of each complexity; a small per-trainer part only needs more than one kind.
+    const thin = list.length >= 12 ? (byComplexity.easy < 3 || byComplexity.medium < 3 || byComplexity.hard < 3) : Object.values(byComplexity).filter(Boolean).length < 2;
+    if (list.length && thin) problems.push(`complexity mix too thin: ${JSON.stringify(byComplexity)}`);
     if (warnings.length) console.log(`warn ${path.basename(file)}: ${warnings.join('; ')}`);
   } else if (!problems.length) {
     problems.push('default export is not an array');

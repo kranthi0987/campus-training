@@ -5,7 +5,7 @@ import { readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { randomBytes } from 'node:crypto';
-import schedule from './schedule.js';
+import schedule, { retired } from './schedule.js';
 import roster from './roster.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -35,9 +35,15 @@ export async function loadSlideDecks() {
   for (const f of readdirSync(dir).filter((f) => f.endsWith('.js') && !f.endsWith('.diagrams.js'))) {
     const deck = (await import(pathToFileURL(path.join(dir, f)).href)).default;
     const key = deck.key || f.replace(/\.js$/, '');
-    const diagramsFile = path.join(dir, `${key}.diagrams.js`);
+    // A trainer's part of a day deck borrows the day's diagrams and pictures (see parts.js).
+    const source = deck.pictures?.dir || key;
+    const diagramsFile = path.join(dir, `${source}.diagrams.js`);
     const diagrams = existsSync(diagramsFile) ? (await import(pathToFileURL(diagramsFile).href)).default : {};
-    decks.set(key, prepareDeck(deck, diagrams, slideImages(key)));
+    const count = (deck.sections || []).reduce((a, sec) => a + (sec.slides || []).length, 0);
+    const images = deck.pictures
+      ? slideImages(source).filter((im) => im.index >= deck.pictures.offset && im.index < deck.pictures.offset + count).map((im) => ({ index: im.index - deck.pictures.offset, url: im.url }))
+      : slideImages(key);
+    decks.set(key, prepareDeck(deck, diagrams, images));
   }
   return decks;
 }
@@ -67,7 +73,7 @@ export function prepareDeck(deck, diagrams = {}, images = []) {
       return out;
     }),
   }));
-  if (!sections.some((s) => s.id === 'agenda')) {
+  if (deck.agenda !== false && !sections.some((s) => s.id === 'agenda')) {
     sections.unshift({
       id: 'agenda',
       title: 'Today',
@@ -75,7 +81,7 @@ export function prepareDeck(deck, diagrams = {}, images = []) {
         title: 'What we cover today',
         bullets: sections.map((s) => s.title),
         agenda: sections.map((s) => ({ id: s.id, title: s.title, count: s.slides.length, first: s.slides.map((x) => x.title).slice(0, 3) })),
-        note: 'Walk the agenda top to bottom and say what the interns will be able to do by the end: call and design a REST API, read a SOAP contract, explain what the gateway protects, follow an event through Kafka, validate a token, and use AI tools without trusting them blindly.',
+        note: deck.agendaNote || 'Walk the agenda top to bottom and say what the interns will be able to do by the end of the session.',
       }],
     });
   }
@@ -108,22 +114,71 @@ export async function seedRosterIfEmpty(db, { log = () => {} } = {}) {
   return roster.length;
 }
 
+/** Inserts one schedule entry with its question bank; returns the question count. */
+async function insertScheduled(db, s) {
+  const code = await uniqueJoinCode(db);
+  const { lastInsertRowid } = await db.run(
+    `INSERT INTO sessions (key, day_no, date, week, module, title, subtopics, trainers, trainer_emails, owner_email, join_code, slides_key)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    s.key, s.dayNo, s.date, s.week, s.module, s.title, s.subtopics, JSON.stringify(s.trainers), JSON.stringify(s.trainerEmails || []), s.owner || null, code, s.slidesKey || null,
+  );
+  const bank = await loadQuestionBank(s.key);
+  await insertQuestions(db, Number(lastInsertRowid), bank);
+  return { count: bank.length, code };
+}
+
 export async function seedIfEmpty(db, { log = () => {} } = {}) {
   const rosterCount = await seedRosterIfEmpty(db, { log });
   const { n } = (await db.get('SELECT COUNT(*) AS n FROM sessions'));
   if (n > 0) return { seeded: false, rosterCount };
   let questions = 0;
   for (const s of schedule) {
-    const code = await uniqueJoinCode(db);
-    const { lastInsertRowid } = await db.run(
-      `INSERT INTO sessions (key, day_no, date, week, module, title, subtopics, trainers, trainer_emails, join_code, slides_key)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      s.key, s.dayNo, s.date, s.week, s.module, s.title, s.subtopics, JSON.stringify(s.trainers), JSON.stringify(s.trainerEmails || []), code, s.slidesKey || null,
-    );
-    const bank = await loadQuestionBank(s.key);
-    await insertQuestions(db, Number(lastInsertRowid), bank);
-    questions += bank.length;
-    log(`seeded ${s.key}: ${bank.length} questions, code ${code}`);
+    const { count, code } = await insertScheduled(db, s);
+    questions += count;
+    log(`seeded ${s.key}: ${count} questions, code ${code}`);
   }
   return { seeded: true, sessions: schedule.length, questions, rosterCount };
+}
+
+/**
+ * Brings an existing database up to date with the schedule, on every start: adds schedule
+ * entries that are missing (a day split into per-trainer parts, a new session), fills in the
+ * owner of a scheduled session that has none, and removes retired entries nobody has joined
+ * or put anything into (an upload, slide edits, checkpoints keep them).
+ * Sessions trainers already edited are otherwise never touched.
+ */
+export async function syncSchedule(db, { log = () => {} } = {}) {
+  const out = { added: [], owned: [], removed: [], kept: [] };
+  const rows = await db.all('SELECT id, key, owner_email, checkpoints, slide_edits FROM sessions WHERE key IS NOT NULL');
+  const byKey = new Map(rows.map((r) => [r.key, r]));
+  for (const s of schedule) {
+    const row = byKey.get(s.key);
+    if (!row) {
+      const { count, code } = await insertScheduled(db, s);
+      out.added.push(s.key);
+      log(`added ${s.key}: ${count} questions, code ${code}`);
+    } else if (!row.owner_email && s.owner) {
+      await db.run('UPDATE sessions SET owner_email = ? WHERE id = ?', s.owner, row.id);
+      out.owned.push(s.key);
+    }
+  }
+  for (const key of retired) {
+    const row = byKey.get(key);
+    if (!row) continue;
+    // Anything a trainer put into the session (participants, an uploaded deck, slide edits,
+    // checkpoints) keeps it: the parts sit beside it and nothing is lost.
+    const { n } = await db.get('SELECT COUNT(*) AS n FROM participants WHERE session_id = ?', row.id);
+    const upload = await db.get('SELECT filename FROM session_decks WHERE session_id = ?', row.id);
+    const reason = n > 0 ? `${n} participants joined it` : upload ? `it holds the uploaded file ${upload.filename}` : row.slide_edits ? 'it has slide edits' : row.checkpoints ? 'it has checkpoints' : null;
+    if (reason) { out.kept.push(key); log(`kept retired ${key}: ${reason}`); continue; }
+    await db.transaction(async (tx) => {
+      await tx.run('DELETE FROM questions WHERE session_id = ?', row.id);
+      await tx.run('DELETE FROM deck_media WHERE session_id = ?', row.id);
+      await tx.run('DELETE FROM session_decks WHERE session_id = ?', row.id);
+      await tx.run('DELETE FROM sessions WHERE id = ?', row.id);
+    });
+    out.removed.push(key);
+    log(`removed ${key}: replaced by per-trainer sessions`);
+  }
+  return out;
 }

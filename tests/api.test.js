@@ -23,9 +23,9 @@ before(async () => {
 after(async () => { await app.close(); });
 
 test('the schedule is seeded with question banks and a slide deck', () => {
-  assert.equal(app.seeded.sessions, 8);
-  assert.ok(app.seeded.questions >= 160, `expected 20+ questions per session, got ${app.seeded.questions}`);
-  assert.ok(app.decks.has('day18-integration-ai'));
+  assert.equal(app.seeded.sessions, 14);
+  assert.ok(app.seeded.questions >= 180, `expected the full banks across the parts, got ${app.seeded.questions}`);
+  assert.ok(app.decks.has('day18-integration'));
 });
 
 test('trainer login: the first sign-in with the default password creates the admin; own password works after change', async () => {
@@ -54,9 +54,9 @@ test('trainer routes need the cookie', async () => {
 
 test('full run: edit questions, open lobby, join, answer, scoreboard, rating, export', async () => {
   const { data: { sessions } } = await call('/api/sessions');
-  const s = sessions.find((x) => x.key === 'day18-integration-ai');
+  const s = sessions.find((x) => x.key === 'day18-integration');
   assert.ok(s.hasSlides);
-  assert.equal(s.questionCount, 26);
+  assert.equal(s.questionCount, 21);
 
   // add one question by form and two by paste, then shorten the session so it runs fast
   const added = await call(`/api/sessions/${s.id}/questions`, { method: 'POST', body: { text: 'Extra question?', options: ['1', '2', '3', '4'], answer: 3, complexity: 'easy', seconds: 5 } });
@@ -132,7 +132,7 @@ test('full run: edit questions, open lobby, join, answer, scoreboard, rating, ex
   assert.equal(slide.status, 200);
   assert.equal((await call('/api/play/state', { token: grace.token, asTrainer: false })).data.state.slide.index, 0);
   const deck = await call(`/api/sessions/${s.id}/deck`);
-  assert.equal(deck.data.deck.slides.length, 26, '25 content slides plus the agenda');
+  assert.equal(deck.data.deck.slides.length, 16, '15 content slides plus the agenda');
 
   // reset
   assert.equal((await call(`/api/sessions/${s.id}/reset`, { method: 'POST' })).status, 200);

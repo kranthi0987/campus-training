@@ -5,10 +5,10 @@
   "description": "Ferguson Training daily quiz: trainer hosts a timed quiz, interns join from laptop or phone over the room Wi-Fi.",
   "type": "module",
   "engines": {
-    "node": ">=22.5"
+    "node": ">=22.9"
   },
   "scripts": {
-    "start": "node server/index.js",
+    "start": "node --env-file-if-exists=.env server/index.js",
     "test": "node --test --test-concurrency=1 \"tests/**/*.test.js\"",
     "validate:questions": "node scripts/validate-questions.mjs"
   },

@@ -180,7 +180,10 @@ function renderEnded(s) {
         ${ratings.trainers.map((t) => html`<div class="row between"><span>${t.trainer}</span><span class="row" style="gap: 10px;">
           <span class="row" style="gap: 2px; color: var(--amber);">${raw([1, 2, 3, 4, 5].map((n) => `<span style="width:18px;height:18px;display:inline-block;opacity:${t.average !== null && n <= Math.round(t.average) ? 1 : 0.2}">${starIcon()}</span>`).join(''))}</span>
           <span class="display" style="font-weight: 700;">${t.average === null ? '–' : t.average.toFixed(1)}</span><span class="tiny muted">(${t.count})</span></span></div>`)}
-        ${ratings.comments.length ? html`<div class="stack small muted" style="gap: 6px; padding-top: 8px; border-top: 1px solid var(--ink-line);">${ratings.comments.map((c) => html`<div>“${c.comment}” <span class="faint">· ${c.name}</span></div>`)}</div>` : ''}
+        ${ratings.rows?.length ? html`<div class="stack" style="gap: 4px; padding-top: 8px; border-top: 1px solid var(--ink-line);">
+          <div class="tiny muted" style="margin-bottom: 4px;">${ratings.rows.length} of ${ratings.participantCount} rated</div>
+          ${ratings.rows.map((r) => html`<div class="row between small" style="gap: 12px; align-items: flex-start;"><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${r.name}</span><span class="row" style="gap: 12px; flex: none; color: #c9cfdc;">${ratings.trainers.map((t) => html`<span title="${t.trainer}">${ratings.trainers.length > 1 ? html`<span class="tiny muted">${t.trainer.split(' ')[0]}</span> ` : ''}<span style="color: var(--amber); font-weight: 700;">${r.stars[t.trainer] ?? '–'}</span>${r.stars[t.trainer] ? '★' : ''}</span>`)}</span></div>${r.comment ? html`<div class="tiny muted" style="margin: -2px 0 4px;">“${r.comment}”</div>` : ''}`)}
+        </div>` : ratings.participantCount ? html`<div class="tiny muted" style="padding-top: 8px; border-top: 1px solid var(--ink-line);">Nobody has rated yet. Interns rate on their phone now that the session has ended.</div>` : ''}
       </div>` : ''}
     </section>
     <section class="stack" style="gap: 24px; align-self: start; min-width: 0;">

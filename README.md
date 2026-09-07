@@ -15,8 +15,9 @@ npm install
 DATABASE_URL=postgresql://user:password@host/dbname npm start
 ```
 
-On the laptop, set `DATABASE_URL` once in the shell (or a `.env` you source) to the database's
-*external* connection string; the hosted service uses the *internal* one. The first start on
+On the laptop, copy `.env.example` to `.env` and put the database's *external* connection
+string in it (`npm start` reads `.env`; the file is git-ignored). The hosted service gets the
+*internal* connection string as an environment variable in the Render dashboard instead. The first start on
 an empty database seeds the sessions, question banks and roster.
 
 The console prints the address to share, for example:
@@ -47,8 +48,17 @@ kept in `data/.session-secret`, so sign-ins survive restarts either way).
    accounts, certificates); **Trainer** only sees the sessions assigned to them, either
    ticked on the Trainers page or matched by name against the session's trainer list.
    Everyone changes their password from the top bar.
-2. Pick the day's session. The eight quiz sessions from the schedule (3 Sep to 17 Sep)
-   are pre-loaded with 24–26 questions each. Review, edit, add, or paste several questions;
+   A trainer also **owns the sessions they create** (*New session*): they pick the other
+   trainers who can host it with them, upload its slides, and delete it when it is done.
+   Co-trainers can open, present and host the session; only the owner and admins change
+   who hosts, replace the slides or delete it. The seeded schedule sessions have no owner
+   and stay admin-managed.
+2. Pick your session. A day with two or three trainers is split into **one session per
+   trainer** (day 12 is "SQL (Azure SQL)" for Dushanth and "MongoDB" for Vishnu; day 13
+   JavaScript and HTML/CSS/React; day 14 DevOps and ETL; day 17 Trilogie, Supply Chain and
+   Salesforce; day 18 Enterprise Integration and AI Assistance), each owned by its trainer
+   with its own slides, questions, join code and quiz. The fourteen sessions from the
+   schedule (3 Sep to 17 Sep) are pre-loaded with their part of the day's question bank. Review, edit, add, or paste several questions;
    set the session time limit and the default seconds per complexity (easy 20, medium 40,
    hard 60); a question can override its own seconds.
 3. **Participants.** Only people on the participant list (`/trainer` → Participants) can
@@ -70,23 +80,21 @@ kept in `data/.session-secret`, so sign-ins survive restarts either way).
 7. **Quiz checkpoints inside a presentation** (3 Sep, Python): the deck from
    "Tech Refresher – Python & Automation.pptx" is in `server/seed/slides/day09-python.js`
    and the 15 questions from "Python & Automation Quiz 1.docx" in
-   `server/seed/questions/day09-python.js`. Slides 7–11 each carry `askAfter: 3`: when the
-   trainer moves past the last point of such a slide, the projector switches to the next
-   three questions (the interns' phones too), and after the third question *Back to slides*
-   returns to the following slide. Questions are consumed in order, so the blocks are
-   Q1–3, Q4–6, Q7–9, Q10–12 (Playwright) and Q13–15 (files). Any questions left over can be
-   run from the host screen, and *Show scoreboard* ends the session. To load a changed
-   bank into an existing database: stop the server and run
-   `node scripts/reload-session.mjs day09-python`.
-   Trainers can place their own checkpoints without touching the deck file: the session
-   page has a **Quiz checkpoints** card (for sessions with a deck) listing every slide with
-   a box for the question numbers to ask after it (`3, 7, 12`, numbered as in the question
-   list; a question can follow only one slide). *Save checkpoints* stores the picks on the
-   session and replaces the deck's `askAfter` values wholesale; *Use deck defaults* goes
-   back to the authored ones. Picked questions run in their blocks, slide by slide; whatever
-   is not picked runs from the host screen at the end, in list order. Skipping a checkpoint
-   slide carries its questions to the next checkpoint. The question list on the same page
-   tags each picked question with its slide.
+   `server/seed/questions/day09-python.js`. When the trainer moves past the last point of a
+   slide that has questions mapped to it, the projector switches to exactly those questions
+   (the interns' phones too), and after the last one *Back to slides* returns to the
+   following slide. Any questions not mapped to a slide run from the host screen at the
+   end, and *Show scoreboard* ends the session. To load a changed bank into an existing
+   database: stop the server and run `node scripts/reload-session.mjs day09-python`.
+   Trainers map questions to slides on the session page: the **Slides & quiz checkpoints**
+   card lists every slide with a box for the question numbers to ask after it (`3, 7, 12`,
+   numbered as in the question list; a question can follow only one slide). *Save
+   checkpoints* stores the picks on the session. Nothing is asked mid-slides until questions
+   are mapped (the `askAfter` values in a deck file are only an author's hint); *Clear all*
+   returns to that. Mapped questions run in their blocks, slide by slide, in the order they
+   were mapped; whatever is not mapped runs at the end, in list order. Skipping a mapped
+   slide carries its questions into the next mapped slide's block. The question list on the
+   same page tags each mapped question with its slide.
    The slides themselves are shown as pictures exported from the PowerPoint file
    (`public/decks/day09-python/slide-01.png` … `slide-16.png`, 1920×1080), so every image,
    layout and colour matches the original; the text in the deck file becomes the trainer's
@@ -94,6 +102,20 @@ kept in `data/.session-secret`, so sign-ins survive restarts either way).
    `scripts/export-slides.ps1` (needs PowerPoint on the trainer laptop), which re-exports
    `slide-NN.png` files; any deck whose folder under `public/decks/<key>/` holds such files
    is shown the same way.
+   **Editing slides per session.** On the session page every slide has Edit (title, points
+   and speaker notes) and Remove; removed slides are listed under the deck and can be
+   restored. Edits live on the session (`sessions.slide_edits`), so the deck file and other
+   sessions using it are untouched; checkpoints follow the slides when one is removed, an open
+   Present screen picks the change up on its own, and a new upload starts clean.
+   **Uploaded slides.** Any session can also take a file from the *Slides* card on its
+   page, no code or export step needed: a **.pptx** is read on the server (titles, bullet
+   points, speaker notes and the pictures on each slide; PowerPoint sections become deck
+   sections) and presented with the same bullet-by-bullet build, notes and checkpoints as
+   a seeded deck, while a **PDF** (File › Save As › PDF) is shown page by page exactly as
+   designed, drawn in the browser by pdf.js. The upload replaces the seeded deck for that
+   session; *Remove* brings it back. Files go into Postgres (`session_decks`, `deck_media`),
+   so they survive deploys; the limit is 40 MB per file. Checkpoints are cleared on upload
+   because the slide count changes.
 8. **Present**: `/present/<session id>` opens on the join screen: the QR code and join
    code large on the right, who has joined so far (live, as interns scan), the sections of
    the day and where the quiz sits ("24 questions: 6 in the middle, after slides 4, 17, and
@@ -112,7 +134,13 @@ kept in `data/.session-secret`, so sign-ins survive restarts either way).
    their name, session, points and rank. The *Certificates* page (`/trainer` →
    Certificates) lists every participant of a finished session with view/print, download,
    and a zip of all certificates; admins see every session there, trainers their own.
-10. **Scorecards** (`/trainer` → Scorecards): *Daily* ranks everyone for one session (with
+10. **Reviews** (`/trainer` → Reviews, admins only): every trainer's average stars and
+   number of ratings across sessions, then per session a table of who gave which trainer
+   how many stars and their comment. Trainers see the ratings for their own session on the
+   host screen's finished view, which lists the same breakdown as the ratings arrive.
+   Scorecards are open to trainers too, limited to their own sessions (totals and ranks
+   count only those); admins keep the full view and the clearing controls.
+11. **Scorecards** (`/trainer` → Scorecards): *Daily* ranks everyone for one session (with
    who did not join), *Weekly* totals points per training week, *Overall* shows every
    session side by side with attendance and totals. CSV export covers all three. *Clear*
    deletes one intern's answers and ratings from every session (for example after a test
@@ -175,7 +203,8 @@ Free-tier limits to plan around:
 ```
 server/            Node server (no framework): http.js router, api.js routes, live.js session engine,
                    db.js Postgres schema + query helper, auth.js accounts + roles, access.js session scoping,
-                   certificate.js + zip.js certificates, bulk.js paste parser
+                   certificate.js + zip.js certificates, bulk.js paste parser,
+                   pptx.js .pptx reader (zip + slide XML), decks.js uploaded slides store
 server/seed/       schedule.js sessions; questions/<key>.js banks; slides/<key>.js decks
 public/            Pages: index (join), play, trainer, host, present + shared app.js / styles.css
 tests/             node --test suites: engine, paste parser, HTTP end-to-end
@@ -187,8 +216,13 @@ design/            The Claude Design canvas the screens are built from
 docs/superpowers/  Design spec
 ```
 
-Seeding runs only when the database is empty, so trainer edits persist. To reload one
-session's bank from disk, run `node scripts/reload-session.mjs <key>`.
+Seeding runs only when the database is empty, so trainer edits persist. On every later start
+the app syncs the schedule: sessions listed in `schedule.js` that are missing are added with
+their banks, scheduled sessions without an owner get theirs, and the `retired` keys (the old
+one-session-per-day entries) are removed when nobody has joined them. To reload one
+session's bank from disk, run `node scripts/reload-session.mjs <key>`. A per-trainer part
+picks its questions from the day's bank file by number (`questions/day12-sql.js`) and its
+slides from the day's deck by section (`slides/day12-sql.js`, see `parts.js`).
 
 ```bash
 TEST_DATABASE_URL=... npm test   # engine, parser and HTTP tests, each file in its own throwaway schema

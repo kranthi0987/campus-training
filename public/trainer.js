@@ -1,4 +1,4 @@
-import { $, $$, api as request, html, raw, pill, toast, fmtDate } from '/app.js';
+import { $, $$, api as request, html, raw, pill, toast, fmtDate, pdfjs, pdfPageTitle, starIcon } from '/app.js';
 
 const app = $('#app');
 
@@ -33,7 +33,8 @@ async function route() {
   if (!trainer) return renderLogin();
   const m = hash.match(/^#\/session\/(\d+)/);
   if (m) return openSession(Number(m[1]));
-  if (hash.startsWith('#/dashboard') && isAdmin()) return renderDashboard();
+  if (hash.startsWith('#/dashboard')) return renderDashboard();
+  if (hash.startsWith('#/reviews') && isAdmin()) return renderReviews();
   if (hash.startsWith('#/participants') && isAdmin()) return renderParticipants();
   if (hash.startsWith('#/trainers') && isAdmin()) return renderTrainers();
   if (hash.startsWith('#/certificates')) return renderCertificates();
@@ -43,26 +44,29 @@ async function route() {
 const isAdmin = () => trainer?.role === 'admin';
 function navLinks() {
   const links = [['#/sessions', 'Sessions', /^#\/(sessions|session\/)/]];
-  if (isAdmin()) links.push(['#/participants', 'Participants', /^#\/participants/], ['#/dashboard', 'Scorecards', /^#\/dashboard/]);
+  if (isAdmin()) links.push(['#/participants', 'Participants', /^#\/participants/]);
+  links.push(['#/dashboard', 'Scorecards', /^#\/dashboard/]);
+  if (isAdmin()) links.push(['#/reviews', 'Reviews', /^#\/reviews/]);
   links.push(['#/certificates', 'Certificates', /^#\/certificates/]);
   if (isAdmin()) links.push(['#/trainers', 'Trainers', /^#\/trainers/]);
   return links;
 }
 
-// Trainer accounts (admin only) for the "who can host this session" pickers.
+// Trainer accounts for the "who can host this session" pickers: admins get the full list,
+// a trainer the directory (names and emails) for the sessions they own.
 let accounts = null;
 async function loadAccounts() {
-  if (!isAdmin()) return [];
-  if (!accounts) { try { ({ trainers: accounts } = await api('/api/trainers')); } catch { accounts = []; } }
-  return accounts.filter((a) => a.role !== 'admin');
+  if (!accounts) { try { ({ trainers: accounts } = await api(isAdmin() ? '/api/trainers' : '/api/trainers/directory')); } catch { accounts = []; } }
+  return accounts.filter((a) => a.role !== 'admin' && a.email !== trainer?.email);
 }
 const pickedAccounts = () => $$('[data-acc]:checked').map((el) => el.dataset.acc);
-function accountPicker(list, selected) {
-  if (!isAdmin()) return '';
-  if (!list.length) return html`<p class="tiny faint">No trainer accounts yet. Add them on the Trainers page to give a trainer access to this session.</p>`;
-  return html`<div class="field"><label>Trainer accounts that can host this session</label>
+/** `manage` = the current user owns the session (or is creating it), so they may pick co-trainers. */
+function accountPicker(list, selected, { manage = isAdmin() } = {}) {
+  if (!manage) return '';
+  if (!list.length) return html`<p class="tiny faint">${isAdmin() ? 'No trainer accounts yet. Add them on the Trainers page to give a trainer access to this session.' : 'No other trainer accounts yet. Ask the admin to add the trainers you want to host with.'}</p>`;
+  return html`<div class="field"><label>${isAdmin() ? 'Trainer accounts that can host this session' : 'Other trainers who can host this session with you'}</label>
     <div class="picklist">${list.map((a) => html`<label class="row small" style="gap: 8px; cursor: pointer;"><input type="checkbox" data-acc="${a.email}" ${selected.includes(a.email) ? 'checked' : ''}><span>${a.name}</span><span class="tiny muted">${a.email}</span></label>`)}</div>
-    <span class="tiny faint">Admins see every session. A trainer also sees sessions whose trainer names include their own name.</span></div>`;
+    <span class="tiny faint">${isAdmin() ? 'Admins see every session. A trainer also sees sessions whose trainer names include their own name.' : 'They can open, present and host it; only you and the admins can change who hosts, replace the slides or delete it.'}</span></div>`;
 }
 
 // ---------------------------------------------------------------- login
@@ -159,25 +163,50 @@ function modal(content) {
 function closeModal() { $('#modal')?.remove(); }
 
 // ---------------------------------------------------------------- sessions
+let groupByTrainer = localStorage.getItem('dq_group') !== '0';
+
 async function renderSessions() {
   ({ sessions } = await api('/api/sessions'));
-  const rows = sessions.map((s) => html`<tr>
+  const rowFor = (s) => html`<tr>
       <td class="num muted">${s.dayNo ?? ''}</td>
       <td class="small">${fmtDate(s.date)}</td>
       <td><div class="tiny muted">${s.module || ''}</div><a class="display" href="#/session/${s.id}" style="color: inherit; text-decoration: none; font-weight: 700;">${s.title}</a></td>
-      <td class="small muted">${s.trainers.join(' · ')}${isAdmin() && s.trainerEmails?.length ? html`<div class="tiny faint">${s.trainerEmails.join(', ')}</div>` : ''}</td>
+      <td class="small muted">${s.trainers.join(' · ')}${isAdmin() && s.trainerEmails?.length ? html`<div class="tiny faint">${s.trainerEmails.join(', ')}</div>` : ''}${s.ownerEmail ? html`<div class="tiny faint">${s.ownerEmail === trainer.email ? 'Created by you' : `Created by ${s.ownerEmail}`}</div>` : ''}</td>
       <td class="num">${s.questionCount}</td>
       <td><span class="pill ${s.status}">${statusLabel(s.status)}</span>${s.participantCount ? html` <span class="tiny muted">${s.participantCount} joined</span>` : ''}</td>
       <td><div class="row" style="gap: 6px; justify-content: flex-end;">
         <a class="btn sm" href="#/session/${s.id}">Questions</a>
         <a class="btn sm" href="/present/${s.id}" target="_blank" title="${s.hasSlides ? 'Slide deck with speaker notes' : 'Content page listing the modules covered'}">${s.hasSlides ? 'Present' : 'Content'}</a>
         <a class="btn sm dark" href="/host/${s.id}" target="_blank">Host</a>
+        ${s.canManage && s.ownerEmail ? html`<button class="btn sm ghost danger" data-del="${s.id}" title="Delete this session">${raw(icon('trash'))}</button>` : ''}
       </div></td>
-    </tr>`);
+    </tr>`;
+  // Admins can see the list split by trainer account: every session under each trainer who
+  // can host it (assigned, created, or matched by name), the rest under "Not assigned".
+  let rows;
+  if (isAdmin() && groupByTrainer) {
+    let accounts = [];
+    try { ({ trainers: accounts } = await api('/api/trainers')); } catch { accounts = []; }
+    const heading = (title, sub, list) => html`<tr class="group"><td colspan="7"><div class="row between wrap" style="gap: 8px;"><span><strong>${title}</strong>${sub ? html` <span class="tiny muted">${sub}</span>` : ''}</span><span class="tiny muted">${list.length} session${list.length === 1 ? '' : 's'}</span></div></td></tr>${list.map(rowFor)}`;
+    const covered = new Set();
+    rows = [];
+    for (const t of accounts.filter((a) => a.role !== 'admin')) {
+      const mine = sessions.filter((x) => t.sessionIds.includes(x.id) || t.matchedSessionIds.includes(x.id) || x.ownerEmail === t.email);
+      if (!mine.length) continue;
+      mine.forEach((x) => covered.add(x.id));
+      rows.push(heading(t.name, t.email, mine));
+    }
+    const rest = sessions.filter((x) => !covered.has(x.id));
+    if (rest.length) rows.push(heading('Not assigned to a trainer', 'admins only, until a trainer is added on the Trainers page', rest));
+    if (!rows.length) rows = sessions.map(rowFor);
+  } else rows = sessions.map(rowFor);
   shell(html`
     <div class="row between wrap" style="margin-bottom: 20px;">
-      <div class="stack" style="gap: 4px;"><h1 style="font-size: 26px;">Sessions</h1><p class="muted small">${isAdmin() ? 'Every session on the training schedule.' : 'The sessions assigned to you.'} Open one to review its questions, then Host it on the projector.</p></div>
-      <button class="btn" id="newSession">${raw(icon('plus'))} New session</button>
+      <div class="stack" style="gap: 4px;"><h1 style="font-size: 26px;">Sessions</h1><p class="muted small">${isAdmin() ? (groupByTrainer ? 'Every session, listed under each trainer who can host it (a session shared by two trainers appears under both).' : 'Every session on the training schedule.') : 'The sessions assigned to you and the ones you created.'} Open one to review its questions and slides, then Host it on the projector.</p></div>
+      <div class="row" style="gap: 8px;">
+        ${isAdmin() ? html`<div class="seg"><button type="button" class="${groupByTrainer ? 'on' : ''}" data-group="1" style="${groupByTrainer ? 'background: var(--brand); color: #fff;' : ''}">By trainer</button><button type="button" class="${groupByTrainer ? '' : 'on'}" data-group="0" style="${groupByTrainer ? '' : 'background: var(--brand); color: #fff;'}">All sessions</button></div>` : ''}
+        <button class="btn" id="newSession">${raw(icon('plus'))} New session</button>
+      </div>
     </div>
     <div class="card" style="padding: 0; overflow: auto;">
       <table class="table sessions">
@@ -186,6 +215,40 @@ async function renderSessions() {
       </table>
     </div>`);
   $('#newSession').addEventListener('click', newSession);
+  $$('[data-group]').forEach((b) => b.addEventListener('click', () => { groupByTrainer = b.dataset.group === '1'; localStorage.setItem('dq_group', groupByTrainer ? '1' : '0'); renderSessions(); }));
+  $$('[data-del]').forEach((b) => b.addEventListener('click', () => deleteSession(sessions.find((x) => x.id === Number(b.dataset.del)), renderSessions)));
+}
+
+// ---------------------------------------------------------------- reviews (ratings)
+const stars = (n, { faint = false } = {}) => html`<span class="row" style="gap: 1px; color: var(--amber); vertical-align: middle;">${raw([1, 2, 3, 4, 5].map((k) => `<span style="width:14px;height:14px;display:inline-block;opacity:${n !== null && n !== undefined && k <= Math.round(n) ? 1 : (faint ? 0.12 : 0.2)}">${starIcon()}</span>`).join(''))}</span>`;
+
+async function renderReviews() {
+  const { trainers, sessions, scoped } = await api('/api/reviews');
+  const rated = sessions.filter((x) => x.ratedCount > 0);
+  const cards = trainers.length ? trainers.map((t) => html`<div class="card stack" style="gap: 6px;">
+      <div class="row between" style="align-items: baseline; gap: 10px;"><strong>${t.trainer}</strong><span class="display" style="font-weight: 800; font-size: 24px;">${t.average === null ? '–' : t.average.toFixed(1)}</span></div>
+      <div class="row between"><span>${stars(t.average)}</span><span class="tiny muted">${t.count} rating${t.count === 1 ? '' : 's'} · ${t.ratedSessions} of ${t.sessions} session${t.sessions === 1 ? '' : 's'} rated</span></div>
+    </div>`) : html`<p class="muted small">No trainers on any session yet.</p>`;
+  const table = (x) => html`<div class="card" style="padding: 0; overflow: auto;">
+      <div class="row between wrap" style="padding: 14px 16px; border-bottom: 1px solid var(--line-soft); gap: 8px;">
+        <div class="row wrap" style="gap: 10px; align-items: baseline;"><span class="tiny muted">Day ${x.dayNo ?? '·'} · ${fmtDate(x.date)}</span><h3>${x.title}</h3><span class="pill ${x.status}">${statusLabel(x.status)}</span></div>
+        <div class="row wrap" style="gap: 14px;">${x.trainers.map((t) => html`<span class="row small" style="gap: 6px;"><span>${t.trainer}</span>${stars(t.average)}<strong>${t.average === null ? '–' : t.average.toFixed(1)}</strong><span class="tiny muted">(${t.count})</span></span>`)}<span class="tiny muted">${x.ratedCount} of ${x.participantCount} rated</span></div>
+      </div>
+      <table class="table">
+        <thead><tr><th>Intern</th><th>Email</th>${x.trainers.map((t) => html`<th>${t.trainer}</th>`)}<th>Comment</th></tr></thead>
+        <tbody>${x.rows.map((r) => html`<tr>
+          <td style="font-weight: 600;">${r.name}</td><td class="small muted">${r.email}</td>
+          ${x.trainers.map((t) => html`<td>${r.stars[t.trainer] ? html`<span class="row" style="gap: 6px;">${stars(r.stars[t.trainer])}<span class="small">${r.stars[t.trainer]}</span></span>` : html`<span class="faint">–</span>`}</td>`)}
+          <td class="small">${r.comment ? html`“${r.comment}”` : html`<span class="faint">–</span>`}</td>
+        </tr>`)}</tbody>
+      </table>
+    </div>`;
+  shell(html`
+    <div class="row between wrap" style="margin-bottom: 20px; gap: 12px;">
+      <div class="stack" style="gap: 4px;"><h1 style="font-size: 26px;">Reviews</h1><p class="muted small">${scoped ? 'How interns rated your sessions: each trainer\'s average, and who gave what.' : 'How interns rated every trainer: averages across sessions, and who gave what in each session.'} Interns rate each trainer 1–5 stars on their phone when the session ends.</p></div>
+    </div>
+    <div class="grid-3" style="gap: 12px; margin-bottom: 20px;">${cards}</div>
+    <div class="stack" style="gap: 16px;">${rated.length ? rated.map(table) : html`<div class="card muted small">No ratings yet. They appear here as soon as a session ends and interns send their stars.</div>`}</div>`);
 }
 
 function statusLabel(s) { return { draft: 'Draft', lobby: 'Lobby open', live: 'Live', ended: 'Finished' }[s] || s; }
@@ -244,7 +307,7 @@ async function renderDashboard() {
           <td style="font-weight: 600;">${it.name}</td><td class="small muted">${it.email}</td>
           ${cols.map((s) => { const r = it.sessions[s.id]; return r ? html`<td class="num" title="${r.correct} correct of ${r.answered} answered"><strong>${r.score}</strong>${cert(r, s)}</td>` : html`<td class="num faint">–</td>`; })}
           <td class="num">${it.attended}</td><td class="num display" style="font-weight: 800;">${it.total}</td>
-          <td><button class="btn sm ghost danger" data-remove-intern="${it.email}" data-name="${it.name}" title="Delete this intern's answers and ratings from every session">Clear</button></td>
+          <td>${isAdmin() ? html`<button class="btn sm ghost danger" data-remove-intern="${it.email}" data-name="${it.name}" title="Delete this intern's answers and ratings from every session">Clear</button>` : ''}</td>
         </tr>`)}</tbody>
         <tfoot><tr><td colspan="3" class="tiny muted">Average per session</td>${cols.map((s) => html`<td class="num tiny muted">${s.avgScore ?? '–'}</td>`)}<td colspan="3"></td></tr></tfoot>
       </table>`;
@@ -252,11 +315,11 @@ async function renderDashboard() {
 
   shell(html`
     <div class="row between wrap" style="margin-bottom: 20px; gap: 12px;">
-      <div class="stack" style="gap: 4px;"><h1 style="font-size: 26px;">Scorecards</h1><p class="muted small">Progress and points for every participant, by day, by week, and overall.</p></div>
+      <div class="stack" style="gap: 4px;"><h1 style="font-size: 26px;">Scorecards</h1><p class="muted small">${isAdmin() ? 'Progress and points for every participant, by day, by week, and overall.' : 'Points for the participants of your sessions, by day, by week, and overall. Other trainers\' sessions are not included.'}</p></div>
       <div class="row wrap" style="gap: 8px;">
         <div class="seg" style="width: 320px;">${[['daily', 'Daily'], ['weekly', 'Weekly'], ['overall', 'Overall']].map(([v, l]) => html`<button type="button" data-view="${v}" style="${dashView === v ? 'background: var(--brand); color: #fff;' : ''}">${l}</button>`)}</div>
         <button class="btn" id="csvBtn">Export CSV</button>
-        <button class="btn danger" id="clearBtn">Clear all test data</button>
+        ${isAdmin() ? html`<button class="btn danger" id="clearBtn">Clear all test data</button>` : ''}
       </div>
     </div>
     <div class="grid-3" style="gap: 12px; margin-bottom: 20px;">
@@ -265,7 +328,7 @@ async function renderDashboard() {
       <div class="card stack" style="gap: 2px;"><span class="eyebrow">Average points per session attended</span><span class="display" style="font-weight: 800; font-size: 28px;">${attendances ? Math.round(totalPoints / attendances) : 0}</span></div>
     </div>
     <div class="card" style="padding: 0; overflow: auto;">${table}</div>
-    <p class="tiny faint" style="margin-top: 12px;">🎓 downloads that intern's certificate for a finished session. Clear (Overall view) deletes one intern's answers and ratings from every session, for example after a test run; the person stays on the participant list. To clear one session only, use Reset session on its host screen.</p>`);
+    <p class="tiny faint" style="margin-top: 12px;">🎓 downloads that intern's certificate for a finished session. ${isAdmin() ? 'Clear (Overall view) deletes one intern\'s answers and ratings from every session, for example after a test run; the person stays on the participant list. ' : ''}To clear one session only, use Reset session on its host screen.</p>`);
 
   $$('[data-view]').forEach((b) => b.addEventListener('click', () => { dashView = b.dataset.view; renderDashboard(); }));
   $('#daySel')?.addEventListener('change', (e) => { dailySessionId = Number(e.target.value); renderDashboard(); });
@@ -274,7 +337,7 @@ async function renderDashboard() {
     try { await api(`/api/interns?email=${encodeURIComponent(b.dataset.removeIntern)}`, { method: 'DELETE' }); toast('Cleared'); renderDashboard(); }
     catch (e) { toast(e.message, { error: true }); }
   }));
-  $('#clearBtn').addEventListener('click', async () => {
+  $('#clearBtn')?.addEventListener('click', async () => {
     const typed = prompt('This deletes every participant, answer and rating in every session and returns all sessions to draft. Questions are kept.\n\nType CLEAR to continue.');
     if (typed !== 'CLEAR') return;
     try { const out = await api('/api/admin/clear-data', { method: 'POST', body: { confirm: 'CLEAR' } }); toast(`Removed ${out.participantsRemoved} participants across ${out.sessionsReset} sessions`); renderDashboard(); }
@@ -342,7 +405,8 @@ async function newSession() {
         <div class="field"><label>Trainers (comma separated)</label><input class="input" id="nsTrainers" placeholder="Name, Name"></div>
       </div>
       <div class="field"><label>Subtopics</label><input class="input" id="nsSub" placeholder="What the session covers"></div>
-      ${accountPicker(accountList, [])}
+      ${accountPicker(accountList, [], { manage: true })}
+      ${isAdmin() ? '' : html`<p class="tiny faint">You own the sessions you create: add slides, questions and co-trainers, and delete it when it is done.</p>`}
       <div class="row" style="justify-content: flex-end;"><button type="button" class="btn" data-close>Cancel</button><button class="btn dark" type="submit">Create</button></div>
     </form>`);
   $('#nsForm').addEventListener('submit', async (e) => {
@@ -369,6 +433,120 @@ async function openSession(id) {
   editing = current.questions[0] || null;
   draft = editing ? fromQuestion(editing) : blankDraft();
   renderBuilder();
+}
+
+// ---------------------------------------------------------------- slides (upload)
+let uploading = null; // progress text while a file is on its way
+
+function renderSlidesCard(s) {
+  const up = s.upload;
+  const live = s.status === 'live';
+  const size = (n) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+  const source = up
+    ? html`<div class="row wrap" style="gap: 10px; align-items: baseline;"><span class="pill lobby">${up.kind === 'pdf' ? 'PDF' : 'PowerPoint'}</span><strong>${up.filename}</strong><span class="small muted">${up.pages} ${up.kind === 'pdf' ? 'pages' : 'slides'} · ${size(up.size)} · uploaded ${fmtDate(new Date(up.uploadedAt).toISOString().slice(0, 10))}${up.uploadedBy ? ` by ${up.uploadedBy}` : ''}</span></div>`
+    : s.slidesFrom === 'seed'
+      ? html`<div class="row wrap" style="gap: 10px; align-items: baseline;"><span class="pill neutral">Built in</span><span class="small muted">This session presents the deck that ships with the app${current.deck ? ` (${current.deck.slides.length} slides)` : ''}. Upload a file to present yours instead.</span></div>`
+      : html`<div class="row wrap" style="gap: 10px; align-items: baseline;"><span class="pill neutral">No slides</span><span class="small muted">Present shows a content page listing the subtopics. Upload a PowerPoint or PDF to present real slides.</span></div>`;
+  return html`
+    <div class="card stack" style="gap: 12px;">
+      <div class="row between wrap" style="gap: 8px;">
+        <h3>Slides</h3>
+        <div class="row" style="gap: 6px;">
+          ${up && !uploading ? html`<button class="btn sm ghost" id="slidesRemove" ${live ? 'disabled' : ''}>${s.slidesFrom === 'seed' || s.slidesKey ? 'Back to built-in deck' : 'Remove'}</button>` : ''}
+          <label class="btn sm dark" style="cursor: pointer; ${live || uploading ? 'opacity: 0.5; pointer-events: none;' : ''}">${raw(icon('plus'))} ${up ? 'Replace file' : 'Upload .pptx or PDF'}<input id="slidesFile" type="file" accept=".pptx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" style="display: none;"></label>
+        </div>
+      </div>
+      ${uploading ? html`<div class="wash row" style="gap: 8px;"><span class="spinner"></span><span>${uploading}</span></div>` : source}
+      <div class="wash row" style="gap: 8px; align-items: flex-start;">${raw(icon('info'))}<span><strong>PowerPoint (.pptx)</strong>: titles, bullet points, speaker notes and pictures are read from the file; bullets build one at a time and notes show on your screen. Layouts and animations are not kept. <strong>PDF</strong> (File › Save As › PDF in PowerPoint): pages show exactly as designed, without builds or notes. Either way quiz checkpoints can follow any slide. Up to 40 MB.${live ? ' Finish the quiz before changing the slides.' : ''}</span></div>
+    </div>`;
+}
+
+async function uploadSlides(file) {
+  const s = current.session;
+  const isPdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
+  if (!isPdf && !/\.pptx$/i.test(file.name)) { toast('Choose a .pptx or a .pdf file', { error: true }); return; }
+  if (file.size > 40 * 1024 * 1024) { toast('That file is over 40 MB. Compress the pictures in PowerPoint (File › Compress) and try again.', { error: true }); return; }
+  const headers = { 'Content-Type': isPdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'X-Filename': encodeURIComponent(file.name) };
+  let titles = null;
+  uploading = `Reading ${file.name}…`;
+  renderBuilder();
+  if (isPdf) {
+    // Count the pages and pick each page's headline here: the server has no PDF engine.
+    try {
+      const lib = await pdfjs();
+      const doc = await lib.getDocument({ data: await file.arrayBuffer() }).promise;
+      headers['X-Pages'] = String(doc.numPages);
+      titles = [];
+      for (let n = 1; n <= doc.numPages; n++) {
+        uploading = `Reading page ${n} of ${doc.numPages}…`;
+        if (n % 5 === 1) renderBuilder();
+        try { titles.push(await pdfPageTitle(await doc.getPage(n))); } catch { titles.push(''); }
+      }
+      doc.destroy?.();
+    } catch (err) { titles = null; console.warn('PDF read in the browser failed; the server will count the pages', err); }
+  }
+  uploading = `Uploading ${file.name}…`;
+  renderBuilder();
+  try {
+    const res = await fetch(`/api/sessions/${s.id}/deck`, { method: 'POST', headers, body: file, credentials: 'same-origin' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`);
+    if (titles && titles.some(Boolean)) await api(`/api/sessions/${s.id}/deck/titles`, { method: 'PUT', body: { titles } }).catch(() => {});
+    uploading = null;
+    toast(`${data.upload.pages} ${data.upload.kind === 'pdf' ? 'pages' : 'slides'} ready to present`);
+    await openSession(s.id);
+  } catch (err) { uploading = null; renderBuilder(); toast(err.message, { error: true }); }
+}
+
+async function removeSlides() {
+  const s = current.session;
+  if (!confirm(s.slidesKey ? 'Remove the uploaded file and present the built-in deck again?' : 'Remove the uploaded slides? Present will show the content page instead.')) return;
+  try { await api(`/api/sessions/${s.id}/deck`, { method: 'DELETE' }); toast('Slides removed'); await openSession(s.id); }
+  catch (err) { toast(err.message, { error: true }); }
+}
+
+async function deleteSession(s, then) {
+  if (!s) return;
+  if (!confirm(`Delete "${s.title}"? Its questions, slides, participants and scores are removed for good.`)) return;
+  try { await api(`/api/sessions/${s.id}`, { method: 'DELETE' }); toast('Session deleted'); await then(); }
+  catch (err) { toast(err.message, { error: true }); }
+}
+
+// ---------------------------------------------------------------- slide edits (per session)
+async function saveSlide(baseIndex, patch, message) {
+  const s = current.session;
+  if (cpDraft && !confirm('You have unsaved checkpoint changes; they will be lost. Continue?')) return;
+  try {
+    await api(`/api/sessions/${s.id}/slides/${baseIndex}`, { method: 'PUT', body: patch });
+    toast(message);
+    cpDraft = null;
+    await openSession(s.id);
+  } catch (err) { toast(err.message, { error: true }); }
+}
+
+function editSlide(baseIndex) {
+  const sl = current.deck.slides.find((x) => x.baseIndex === baseIndex);
+  if (!sl) return;
+  const fixed = !!sl.pdfPage;
+  modal(html`<h2>Edit slide</h2>
+    <p class="small muted" style="margin-top: 6px;">Changes apply to this session only${sl.image ? '; the picture stays as exported, the points are your talking points under it' : fixed ? '; a PDF page keeps its picture, you can rename it and add notes' : ''}.</p>
+    <form id="slideForm" class="stack" style="gap: 14px; margin-top: 16px;">
+      <div class="field"><label>Title</label><input class="input" id="slTitle" value="${sl.title}" required maxlength="200"></div>
+      ${fixed || sl.agenda ? '' : html`<div class="field"><label>Points, one per line${sl.image ? ' (talking points)' : ' (shown one at a time)'}</label><textarea class="input" id="slBullets" style="min-height: 160px; font-size: 14px;">${(sl.bullets || []).join('\n')}</textarea></div>`}
+      <div class="field"><label>Speaker notes <span class="faint" style="font-weight: 400;">(only on your screen)</span></label><textarea class="input" id="slNote" style="min-height: 100px; font-size: 14px;">${sl.note || ''}</textarea></div>
+      <div class="row between wrap" style="gap: 8px;">
+        ${sl.edited ? html`<button type="button" class="btn ghost" id="slReset">Back to the deck's version</button>` : html`<span></span>`}
+        <div class="row" style="gap: 8px;"><button type="button" class="btn" data-close>Cancel</button><button class="btn dark" type="submit">Save</button></div>
+      </div>
+    </form>`);
+  $('#slideForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const patch = { title: $('#slTitle').value, note: $('#slNote').value };
+    if ($('#slBullets')) patch.bullets = $('#slBullets').value.split('\n').map((x) => x.trim()).filter(Boolean);
+    closeModal();
+    saveSlide(baseIndex, patch, 'Slide saved');
+  });
+  $('#slReset')?.addEventListener('click', () => { closeModal(); saveSlide(baseIndex, { reset: true }, 'Slide back to the deck\'s version'); });
 }
 
 function blankDraft() { return { text: '', code: '', options: ['', '', '', ''], answer: -1, complexity: 'medium', seconds: '', explanation: '' }; }
@@ -431,13 +609,13 @@ function renderBuilder() {
     checkpointsCard = html`
       <div class="card stack" style="gap: 12px;">
         <div class="row between wrap" style="gap: 8px;">
-          <div class="row" style="gap: 8px; align-items: baseline;"><h3>Quiz checkpoints</h3><span class="tiny muted">${custom ? 'custom for this session' : 'as authored in the deck'}</span></div>
+          <div class="row" style="gap: 8px; align-items: baseline;"><h3>Slides &amp; quiz checkpoints</h3><span class="tiny muted">${custom ? 'questions mapped to slides' : 'no questions mapped: the whole quiz runs at the end'}</span></div>
           <div class="row" style="gap: 6px;">
-            ${custom && !cpDraft ? html`<button class="btn sm" id="cpReset">Use deck defaults</button>` : ''}
+            ${custom && !cpDraft ? html`<button class="btn sm" id="cpReset">Clear all</button>` : ''}
             ${cpDraft ? html`<button class="btn sm ghost" id="cpCancel">Cancel</button><button class="btn sm dark" id="cpSave">Save checkpoints</button>` : ''}
           </div>
         </div>
-        <div class="wash row" style="gap: 8px; align-items: flex-start;">${raw(icon('info'))}<span>Type the question numbers to ask right after a slide, like <span class="mono">3, 7, 12</span> (numbers as in the list below). A question can follow only one slide. ${assigned.size ? html`<strong>${assigned.size} of ${qs.length}</strong> placed during the slides.` : 'None placed yet.'} ${unassigned.length ? html`Not placed: <span class="mono">${unassigned.slice(0, 20).join(', ')}${unassigned.length > 20 ? '…' : ''}</span>; ${unassigned.length === qs.length ? 'the whole quiz' : 'they'} run${unassigned.length === 1 ? 's' : ''} from the host screen at the end.` : 'Nothing is left for the end.'}</span></div>
+        <div class="wash row" style="gap: 8px; align-items: flex-start;">${raw(icon('info'))}<span>Edit a slide's title, points or notes, or remove it from this session (the deck itself is not changed; removed slides can be brought back). Type the question numbers to ask right after a slide, like <span class="mono">3, 7, 12</span> (numbers as in the list below); the slide then ends with a quiz block of exactly those questions. A question can follow only one slide; slides with nothing typed show no quiz. ${assigned.size ? html`<strong>${assigned.size} of ${qs.length}</strong> placed during the slides.` : 'None placed yet.'} ${unassigned.length ? html`Not placed: <span class="mono">${unassigned.slice(0, 20).join(', ')}${unassigned.length > 20 ? '…' : ''}</span>; ${unassigned.length === qs.length ? 'the whole quiz' : 'they'} run${unassigned.length === 1 ? 's' : ''} from the host screen at the end.` : 'Nothing is left for the end.'}</span></div>
         <div class="stack" style="gap: 0; max-height: 420px; overflow: auto; border: 1px solid var(--line-soft); border-radius: 8px;">
           ${slides.map((sl, i) => {
             const head = sl.sectionId !== lastSection ? html`<div class="tiny muted" style="padding: 8px 12px 4px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; background: var(--wash);">${sl.sectionTitle}</div>` : '';
@@ -445,22 +623,28 @@ function renderBuilder() {
             const picks = cps[i] || [];
             const nums = picks.map((id) => numberOf.get(id)).filter(Boolean);
             return html`${head}<div class="row between" style="gap: 10px; padding: 6px 12px; border-top: 1px solid var(--line-soft); ${nums.length ? 'background: #f2f8fd;' : ''}">
-              <span class="small" style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><span class="muted">${i + 1}.</span> ${sl.title}</span>
-              <span class="row" style="gap: 6px; flex: none;"><input class="input mono" data-cp="${i}" value="${nums.join(', ')}" placeholder="e.g. 1, 2" title="Question numbers to ask after this slide" style="width: 128px; height: 32px; padding: 0 8px; font-weight: 700; font-size: 13px;"><span class="tiny muted" style="width: 30px;">${nums.length ? `${nums.length} q` : ''}</span></span>
+              <span class="small" style="min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${sl.title}"><span class="muted">${i + 1}.</span> ${sl.title}${sl.edited ? html` <span class="tiny" style="color: var(--brand); font-weight: 600;">edited</span>` : ''}</span>
+              <span class="row" style="gap: 6px; flex: none;">
+                <button class="btn sm ghost" data-edit-slide="${sl.baseIndex}" title="Edit this slide's title, points and notes for this session" style="height: 28px; padding: 0 5px;">${raw(icon('edit'))}</button>
+                <button class="btn sm ghost danger" data-hide-slide="${sl.baseIndex}" title="Remove this slide from this session" style="height: 28px; padding: 0 5px;">${raw(icon('trash'))}</button>
+                <input class="input mono" data-cp="${i}" value="${nums.join(', ')}" placeholder="q 1, 2" title="Question numbers to ask after this slide" style="width: 84px; height: 30px; padding: 0 8px; font-weight: 700; font-size: 13px;"><span class="tiny muted" style="width: 22px;">${nums.length ? `${nums.length}q` : ''}</span></span>
             </div>`;
           })}
         </div>
+        ${current.deck.hidden?.length ? html`<div class="wash row wrap" style="gap: 8px; align-items: center;"><span class="small"><strong>Removed from this session:</strong></span>${current.deck.hidden.map((h) => html`<span class="row small" style="gap: 6px; background: #fff; border: 1px solid var(--line-soft); border-radius: 999px; padding: 3px 4px 3px 10px;">${h.title}<button class="btn sm ghost" data-restore-slide="${h.baseIndex}" style="height: 24px; padding: 0 8px;">Restore</button></span>`)}</div>` : ''}
       </div>`;
   }
 
+  const slidesCard = renderSlidesCard(s);
   shell(html`
     <div class="row between wrap" style="margin-bottom: 20px; gap: 12px;">
       <div class="stack" style="gap: 2px;">
-        <div class="row" style="gap: 10px;"><span class="small muted">${s.module || 'Session'} · ${fmtDate(s.date)}</span><span class="pill ${s.status}">${statusLabel(s.status)}</span></div>
+        <div class="row" style="gap: 10px;"><span class="small muted">${s.module || 'Session'} · ${fmtDate(s.date)}</span><span class="pill ${s.status}">${statusLabel(s.status)}</span>${s.ownerEmail ? html`<span class="tiny faint">${s.ownerEmail === trainer.email ? 'created by you' : `created by ${s.ownerEmail}`}</span>` : ''}</div>
         <h1 style="font-size: 24px;">${s.title}</h1>
         <div class="small muted">${s.trainers.join(' · ')}</div>
       </div>
       <div class="row wrap" style="gap: 8px;">
+        ${s.canManage && s.ownerEmail ? html`<button class="btn ghost danger" id="delSession" title="Delete this session and everything in it">${raw(icon('trash'))} Delete</button>` : ''}
         <a class="btn" href="/present/${s.id}" target="_blank">${raw(icon('present'))} ${s.hasSlides ? 'Present slides' : 'Show content'}</a>
         <a class="btn primary" href="/host/${s.id}" target="_blank">${raw(icon('play'))} ${s.status === 'draft' ? 'Open lobby' : 'Open host screen'}</a>
       </div>
@@ -502,6 +686,7 @@ function renderBuilder() {
           </div>
           <div class="wash row" style="gap: 8px;">${raw(icon('info'))}<span>Scoring is fixed: 100 points for a correct answer, 0 for a wrong one.</span></div>
         </div>
+        ${raw(slidesCard)}
         ${raw(checkpointsCard)}
         <div class="card" style="padding: 0; overflow: hidden;">
           <div class="row between wrap" style="padding: 14px 16px 10px; border-bottom: 1px solid var(--line-soft); gap: 8px;">
@@ -546,11 +731,22 @@ function renderBuilder() {
     if (moved) toast(`${moved} question${moved === 1 ? '' : 's'} moved here from another slide`);
     renderBuilder();
   }));
+  $$('[data-edit-slide]').forEach((b) => b.addEventListener('click', () => editSlide(Number(b.dataset.editSlide))));
+  $$('[data-hide-slide]').forEach((b) => b.addEventListener('click', () => {
+    const sl = current.deck.slides.find((x) => x.baseIndex === Number(b.dataset.hideSlide));
+    if (!confirm(`Remove "${sl?.title || 'this slide'}" from this session? You can bring it back from the list below.`)) return;
+    saveSlide(Number(b.dataset.hideSlide), { hidden: true }, 'Slide removed from this session');
+  }));
+  $$('[data-restore-slide]').forEach((b) => b.addEventListener('click', () => saveSlide(Number(b.dataset.restoreSlide), { hidden: false }, 'Slide restored')));
   $('#cpSave')?.addEventListener('click', () => saveCheckpoints(cpDraft));
   $('#cpCancel')?.addEventListener('click', () => { cpDraft = null; renderBuilder(); });
   $('#cpReset')?.addEventListener('click', () => saveCheckpoints(null));
   $('#newCode').addEventListener('click', async () => { if (!confirm('Generate a new join code? Anyone using the old one will have to re-enter it.')) return; current.session = (await api(`/api/sessions/${s.id}/code`, { method: 'POST' })).session; renderBuilder(); });
   $('#editMeta').addEventListener('click', editMeta);
+  $('#delSession')?.addEventListener('click', () => deleteSession(s, () => { location.hash = '#/sessions'; }));
+  // slides
+  $('#slidesFile')?.addEventListener('change', () => { const f = $('#slidesFile').files[0]; if (f) uploadSlides(f); });
+  $('#slidesRemove')?.addEventListener('click', removeSlides);
   // list
   $$('.qrow').forEach((row) => row.addEventListener('click', () => { editing = qs.find((q) => q.id === Number(row.dataset.id)); draft = fromQuestion(editing); renderBuilder(); }));
   $('#addBtn').addEventListener('click', () => { editing = null; draft = blankDraft(); renderBuilder(); $('#qText').focus(); });
@@ -574,20 +770,9 @@ function renderBuilder() {
  * one 4–6, and so on) so the trainer sees numbers they can edit.
  */
 function checkpointPicks(s, slides, qs) {
-  if (s.checkpoints && typeof s.checkpoints === 'object') {
-    const ids = new Set(qs.map((q) => q.id));
-    return Object.fromEntries(Object.entries(s.checkpoints).map(([k, v]) => [k, (Array.isArray(v) ? v : []).filter((id) => ids.has(id))]).filter(([, v]) => v.length));
-  }
-  const out = {};
-  let c = 0;
-  slides.forEach((sl, i) => {
-    const n = sl.askAfter || 0;
-    if (!n) return;
-    const picks = qs.slice(c, c + n).map((q) => q.id);
-    c += n;
-    if (picks.length) out[i] = picks;
-  });
-  return out;
+  if (!s.checkpoints || typeof s.checkpoints !== 'object') return {};
+  const ids = new Set(qs.map((q) => q.id));
+  return Object.fromEntries(Object.entries(s.checkpoints).map(([k, v]) => [k, (Array.isArray(v) ? v : []).filter((id) => ids.has(id))]).filter(([, v]) => v.length));
 }
 
 async function saveCheckpoints(checkpoints) {
@@ -597,7 +782,7 @@ async function saveCheckpoints(checkpoints) {
     current.deck = (await api(`/api/sessions/${current.session.id}/deck`)).deck;
     cpDraft = null;
     renderBuilder();
-    toast(checkpoints === null ? 'Back to the deck\'s own checkpoints' : 'Checkpoints saved');
+    toast(checkpoints === null ? 'Checkpoints cleared: the whole quiz runs at the end' : 'Checkpoints saved');
   } catch (err) { toast(err.message, { error: true }); }
 }
 
@@ -638,13 +823,13 @@ async function editMeta() {
         <div class="field"><label>Trainers (comma separated; interns rate each)</label><input class="input" id="mTrainers" value="${s.trainers.join(', ')}"></div>
       </div>
       <div class="field"><label>Subtopics</label><input class="input" id="mSub" value="${s.subtopics || ''}"></div>
-      ${accountPicker(accountList, s.trainerEmails || [])}
+      ${accountPicker(accountList, s.trainerEmails || [], { manage: !!s.canManage })}
       <div class="row" style="justify-content: flex-end;"><button type="button" class="btn" data-close>Cancel</button><button class="btn dark" type="submit">Save</button></div>
     </form>`);
   $('#metaForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const patch = { title: $('#mTitle').value, module: $('#mModule').value, date: $('#mDate').value, trainers: $('#mTrainers').value.split(',').map((t) => t.trim()).filter(Boolean), subtopics: $('#mSub').value };
-    if (isAdmin()) patch.trainerEmails = pickedAccounts();
+    if (s.canManage) patch.trainerEmails = pickedAccounts();
     closeModal();
     await saveSettings(patch);
   });
@@ -798,6 +983,7 @@ function icon(name) {
     bars: `<svg ${s} stroke="#5fb2ea" width="20" height="20"><path d="M3 16h14M6 16V9M10 16V4M14 16v-5"></path></svg>`,
     info: `<svg ${s}><circle cx="10" cy="10" r="7.5"></circle><path d="M10 9v5M10 6.5v.5"></path></svg>`,
     plus: `<svg ${s}><path d="M10 4v12M4 10h12"></path></svg>`,
+    edit: `<svg ${s}><path d="M4 16h3l8.5-8.5-3-3L4 13v3zM11.5 5.5l3 3"></path></svg>`,
     trash: `<svg ${s}><path d="M3 5.5h14M7.5 5.5V4h5v1.5M5 5.5l.8 10.5h8.4l.8-10.5"></path></svg>`,
     check: `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5l2.5 2.5 4.5-5"></path></svg>`,
     refresh: `<svg ${s}><path d="M16 10a6 6 0 1 1-1.8-4.3M16 3v3.5h-3.5"></path></svg>`,

@@ -110,3 +110,27 @@ export function toast(message, { error = false, ms = 3200 } = {}) {
 }
 
 export function qs(name) { return new URLSearchParams(location.search).get(name); }
+
+// ---- PDF rendering (pdf.js from cdnjs, loaded only when a PDF deck is on screen) ----------
+const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38';
+let pdfjsPromise = null;
+/** The pdf.js library, loaded once. Rejects when the CDN cannot be reached. */
+export function pdfjs() {
+  if (!pdfjsPromise) {
+    pdfjsPromise = import(`${PDFJS}/pdf.min.mjs`).then((lib) => { lib.GlobalWorkerOptions.workerSrc = `${PDFJS}/pdf.worker.min.mjs`; return lib; })
+      .catch((e) => { pdfjsPromise = null; throw new Error(`PDF viewer could not load (${e.message})`); });
+  }
+  return pdfjsPromise;
+}
+
+/** A page's headline: the largest text on it, at most 80 characters. */
+export async function pdfPageTitle(page) {
+  const { items } = await page.getTextContent();
+  const texts = items.filter((it) => it.str && it.str.trim());
+  if (!texts.length) return '';
+  const size = (it) => Math.abs(it.transform?.[3] || it.height || 0);
+  const max = Math.max(...texts.map(size));
+  const first = texts.find((it) => size(it) >= max - 0.5);
+  const line = texts.filter((it) => size(it) >= max - 0.5 && Math.abs((it.transform?.[5] || 0) - (first.transform?.[5] || 0)) < max);
+  return line.map((it) => it.str).join(' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+}

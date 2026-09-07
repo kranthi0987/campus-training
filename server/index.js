@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { openDb, openTestDb } from './db.js';
 import { Auth } from './auth.js';
 import { Live, LiveError } from './live.js';
-import { seedIfEmpty, loadSlideDecks } from './seed/index.js';
+import { seedIfEmpty, syncSchedule, loadSlideDecks } from './seed/index.js';
 import { createApi } from './api.js';
 import { HttpError, sendJson } from './http.js';
 import { createStatic } from './static.js';
@@ -60,6 +60,7 @@ export async function createApp({ databaseUrl, test = false, publicUrl, secret }
   const db = test ? await openTestDb() : await openDb({ url: databaseUrl });
   log(`database: Postgres${db.schema ? ` (schema ${db.schema})` : ''}`);
   const seeded = await seedIfEmpty(db, { log });
+  if (!seeded.seeded) seeded.synced = await syncSchedule(db, { log });
   const decks = await loadSlideDecks();
   const auth = new Auth(db, { secret: secret || (test ? null : sessionSecret()) });
   const live = new Live(db, { decks });

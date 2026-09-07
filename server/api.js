@@ -6,10 +6,11 @@ import { COOKIE, normalizeEmail } from './auth.js';
 import { parseBulk } from './bulk.js';
 import { insertQuestions, uniqueJoinCode } from './seed/index.js';
 import { rowToQuestion, rowToSession } from './db.js';
-import { flattenDeck } from './live.js';
+import { flattenDeck, applySlideEdits, checkpointsAfterHide, checkpointsAfterRestore } from './live.js';
 import { certificateSvg, certificateFilename } from './certificate.js';
-import { sessionAllows } from './access.js';
+import { sessionAllows, sessionManagedBy } from './access.js';
 import { zipStore } from './zip.js';
+import { readRaw, MAX_UPLOAD } from './decks.js';
 
 const COMPLEXITY = new Set(['easy', 'medium', 'hard']);
 
@@ -42,6 +43,18 @@ export async function createApi({ db, live, auth, decks, publicUrl }) {
     return { ...(await requireSession(req, p.session_id)), participant: p };
   };
   const participantToken = (req, url) => req.headers['x-participant-token'] || url.searchParams.get('token') || '';
+  /** A trainer on the session, or an intern who joined it (their phone mirrors the slides, pictures included). */
+  const requireViewer = async (req, url, id) => {
+    const user = await userOf(req);
+    if (user) {
+      const session = await live.mustSession(id);
+      if (!sessionAllows(session, user)) throw new HttpError(403, 'This session is assigned to another trainer');
+      return { user, session };
+    }
+    const p = await live.participant(participantToken(req, url));
+    if (!p || p.sessionId !== id) throw new HttpError(401, 'Sign in as a trainer or join the session first');
+    return { participant: p, session: await live.mustSession(id) };
+  };
   const sessionId = (params) => {
     const id = Number(params.id);
     if (!Number.isInteger(id)) throw new HttpError(400, 'Bad session id');
@@ -54,10 +67,19 @@ export async function createApi({ db, live, auth, decks, publicUrl }) {
     for (const e of list.map(normalizeEmail)) if (e && !out.includes(e) && await auth.get(e)) out.push(e);
     return out;
   };
-  const sessionSummary = (row) => ({ ...rowToSession(row), questionCount: row.question_count, participantCount: row.participant_count, hasSlides: !!(row.slides_key && decks.has(row.slides_key)) });
-  const allSessions = async () => (await db.all(`SELECT s.*, (SELECT COUNT(*) FROM questions q WHERE q.session_id = s.id) AS question_count,
-            (SELECT COUNT(*) FROM participants p WHERE p.session_id = s.id) AS participant_count
-       FROM sessions s ORDER BY s.date, s.day_no, s.id`,)).map(sessionSummary);
+  /** Where the session's slides come from: 'upload' (a trainer's file), 'seed' (a deck in the code) or null. */
+  const slidesFrom = (s, upload) => (upload ? 'upload' : s.slidesKey && decks.has(s.slidesKey) ? 'seed' : null);
+  const withAccess = (s, user, upload) => ({ ...s, upload, slidesFrom: slidesFrom(s, upload), hasSlides: !!slidesFrom(s, upload), canManage: sessionManagedBy(s, user) });
+  const sessionSummary = (row, user) => withAccess(
+    { ...rowToSession(row), questionCount: row.question_count, participantCount: row.participant_count }, user,
+    row.upload_kind ? { kind: row.upload_kind, filename: row.upload_filename, size: row.upload_size, pages: row.upload_pages, uploadedBy: row.uploaded_by, uploadedAt: row.uploaded_at } : null,
+  );
+  const allSessions = async (user) => (await db.all(`SELECT s.*, (SELECT COUNT(*) FROM questions q WHERE q.session_id = s.id) AS question_count,
+            (SELECT COUNT(*) FROM participants p WHERE p.session_id = s.id) AS participant_count,
+            d.kind AS upload_kind, d.filename AS upload_filename, d.size AS upload_size, d.pages AS upload_pages, d.uploaded_by, d.uploaded_at
+       FROM sessions s LEFT JOIN session_decks d ON d.session_id = s.id ORDER BY s.date, s.day_no, s.id`,)).map((row) => sessionSummary(row, user));
+  /** One session as the trainer page shows it, with its slides source and what this user may do. */
+  const sessionFor = async (id, user) => withAccess(await live.mustSession(id), user, await live.deckStore.info(id));
 
   // ---- info ---------------------------------------------------------------
   r.get('/api/info', async (req, res) => sendJson(res, 200, { publicUrl, setupNeeded: (await auth.count()) === 0 }));
@@ -109,6 +131,11 @@ export async function createApi({ db, live, auth, decks, publicUrl }) {
   };
 
   r.get('/api/trainers', async (req, res) => { await requireAdmin(req); sendJson(res, 200, { trainers: await trainerList() }); });
+  // Names and emails only, for the co-trainer picker on a session a trainer owns.
+  r.get('/api/trainers/directory', async (req, res) => {
+    await requireTrainer(req);
+    sendJson(res, 200, { trainers: (await auth.list()).map((t) => ({ email: t.email, name: t.name, role: t.role })) });
+  });
 
   r.post('/api/trainers', async (req, res) => {
     await requireAdmin(req);
@@ -140,7 +167,7 @@ export async function createApi({ db, live, auth, decks, publicUrl }) {
   // ---- sessions -----------------------------------------------------------
   r.get('/api/sessions', async (req, res) => {
     const user = await requireTrainer(req);
-    sendJson(res, 200, { sessions: (await allSessions()).filter((s) => sessionAllows(s, user)) });
+    sendJson(res, 200, { sessions: (await allSessions(user)).filter((s) => sessionAllows(s, user)) });
   });
 
   // ---- roster: everyone signed in may read it, only admins change it ------
@@ -172,16 +199,25 @@ export async function createApi({ db, live, auth, decks, publicUrl }) {
     const title = String(b.title || '').trim();
     if (!title) throw new HttpError(400, 'Title is required');
     const trainers = Array.isArray(b.trainers) ? b.trainers.map((t) => String(t).trim()).filter(Boolean) : [];
-    // A trainer's own session is assigned to them; an admin picks the accounts.
-    const trainerEmails = user.role === 'admin' ? await cleanEmails(b.trainerEmails) : [user.email];
-    const { lastInsertRowid } = (await db.run('INSERT INTO sessions (day_no, date, module, title, subtopics, trainers, join_code, trainer_emails) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', b.dayNo ?? null, String(b.date || '').slice(0, 10) || null, String(b.module || '').trim() || null, title, String(b.subtopics || '').trim(), JSON.stringify(trainers), await uniqueJoinCode(db), JSON.stringify(trainerEmails)));
-    sendJson(res, 201, { session: await live.session(Number(lastInsertRowid)) });
+    // The creator owns the session. A trainer's own session is always assigned to them as well;
+    // owner and admin may add co-trainers.
+    const picked = await cleanEmails(b.trainerEmails);
+    const trainerEmails = user.role === 'admin' ? picked : [user.email, ...picked.filter((e) => e !== user.email)];
+    const { lastInsertRowid } = (await db.run('INSERT INTO sessions (day_no, date, module, title, subtopics, trainers, join_code, trainer_emails, owner_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', b.dayNo ?? null, String(b.date || '').slice(0, 10) || null, String(b.module || '').trim() || null, title, String(b.subtopics || '').trim(), JSON.stringify(trainers), await uniqueJoinCode(db), JSON.stringify(trainerEmails), user.email));
+    sendJson(res, 201, { session: await sessionFor(Number(lastInsertRowid), user) });
   });
 
   r.get('/api/sessions/:id', async (req, res, params) => {
     const id = sessionId(params);
-    const { session: s } = await requireSession(req, id);
-    sendJson(res, 200, { session: { ...s, hasSlides: !!(s.slidesKey && decks.has(s.slidesKey)) }, questions: await live.listQuestions(id) });
+    const { user } = await requireSession(req, id);
+    sendJson(res, 200, { session: await sessionFor(id, user), questions: await live.listQuestions(id) });
+  });
+
+  r.delete('/api/sessions/:id', async (req, res, params) => {
+    const id = sessionId(params);
+    const { user, session: s } = await requireSession(req, id);
+    if (!sessionManagedBy(s, user)) throw new HttpError(403, "Only the session's owner or an admin can delete it");
+    sendJson(res, 200, await live.deleteSession(id));
   });
 
   r.put('/api/sessions/:id', async (req, res, params) => {
@@ -195,7 +231,12 @@ export async function createApi({ db, live, auth, decks, publicUrl }) {
       return n;
     };
     const trainers = b.trainers === undefined ? s.trainers : (Array.isArray(b.trainers) ? b.trainers.map((t) => String(t).trim()).filter(Boolean) : s.trainers);
-    const trainerEmails = user.role === 'admin' && b.trainerEmails !== undefined ? await cleanEmails(b.trainerEmails) : s.trainerEmails;
+    let trainerEmails = s.trainerEmails;
+    if (b.trainerEmails !== undefined && sessionManagedBy(s, user)) {
+      const picked = await cleanEmails(b.trainerEmails);
+      // An owner stays on their own session.
+      trainerEmails = user.role === 'admin' || picked.includes(user.email) ? picked : [user.email, ...picked];
+    }
     const reveal = b.reveal === undefined ? s.reveal : String(b.reveal);
     if (!['end', 'each'].includes(reveal)) throw new HttpError(400, 'reveal must be "end" or "each"');
     // Quiz checkpoints: {"<slide index>": [question ids to ask after that slide]}; null returns to the deck's own.
@@ -230,7 +271,73 @@ export async function createApi({ db, live, auth, decks, publicUrl }) {
       num(b.timeLimitMin, 1, 600, s.timeLimitMin), num(b.easyS, 5, 600, s.easyS), num(b.mediumS, 5, 600, s.mediumS), num(b.hardS, 5, 600, s.hardS), reveal,
       checkpoints === null ? null : JSON.stringify(checkpoints), id,));
     await live.broadcast(id);
-    sendJson(res, 200, { session: await live.session(id) });
+    sendJson(res, 200, { session: await sessionFor(id, user) });
+  });
+
+  // ---- uploaded slides (a .pptx or a PDF per session) ---------------------
+  r.post('/api/sessions/:id/deck', async (req, res, params) => {
+    const id = sessionId(params);
+    const { user, session: s } = await requireSession(req, id);
+    if (s.status === 'live') throw new HttpError(409, 'Finish the quiz before changing the slides');
+    let buf;
+    try { buf = await readRaw(req, MAX_UPLOAD); } catch (e) { throw new HttpError(e.status || 400, e.message); }
+    let titles = [];
+    try { titles = req.headers['x-page-titles'] ? JSON.parse(Buffer.from(String(req.headers['x-page-titles']), 'base64').toString('utf8')) : []; } catch { titles = []; }
+    let upload;
+    try {
+      upload = await live.deckStore.put(id, {
+        buf, filename: decodeURIComponent(String(req.headers['x-filename'] || '')), contentType: req.headers['content-type'],
+        uploadedBy: user.email, pages: Number(req.headers['x-pages']) || 0, titles,
+      });
+    } catch (e) { throw new HttpError(e.status || 500, e.message); }
+    // The slides changed: checkpoints, slide edits and the slide position no longer line up.
+    await db.run('UPDATE sessions SET checkpoints = NULL, slide_edits = NULL, slide_index = -1, slide_step = 0 WHERE id = ?', id);
+    live.forgetUpload(id);
+    await live.broadcast(id);
+    sendJson(res, 201, { session: await sessionFor(id, user), upload });
+  });
+
+  r.put('/api/sessions/:id/deck/titles', async (req, res, params) => {
+    const id = sessionId(params);
+    const { user } = await requireSession(req, id);
+    const b = await readBody(req);
+    let upload;
+    try { upload = await live.deckStore.setTitles(id, b.titles); } catch (e) { throw new HttpError(e.status || 500, e.message); }
+    live.forgetUpload(id);
+    await live.broadcast(id);
+    sendJson(res, 200, { session: await sessionFor(id, user), upload });
+  });
+
+  r.delete('/api/sessions/:id/deck', async (req, res, params) => {
+    const id = sessionId(params);
+    const { user, session: s } = await requireSession(req, id);
+    if (s.status === 'live') throw new HttpError(409, 'Finish the quiz before changing the slides');
+    await live.deckStore.remove(id);
+    await db.run('UPDATE sessions SET checkpoints = NULL, slide_edits = NULL, slide_index = -1, slide_step = 0 WHERE id = ?', id);
+    live.forgetUpload(id);
+    await live.broadcast(id);
+    sendJson(res, 200, { session: await sessionFor(id, user) });
+  });
+
+  const sendBytes = (req, res, { data, mime, version }) => {
+    const etag = `"${version}-${data.length}"`;
+    if (req.headers['if-none-match'] === etag) { res.writeHead(304); res.end(); return; }
+    res.writeHead(200, { 'Content-Type': mime, 'Content-Length': data.length, 'Cache-Control': 'private, max-age=86400', ETag: etag });
+    res.end(req.method === 'HEAD' ? undefined : data);
+  };
+  r.get('/api/sessions/:id/deck/file', async (req, res, params, url) => {
+    const id = sessionId(params);
+    await requireViewer(req, url, id);
+    const f = await live.deckStore.file(id);
+    if (!f) throw new HttpError(404, 'No PDF for this session');
+    sendBytes(req, res, f);
+  });
+  r.get('/api/sessions/:id/deck/media/:name', async (req, res, params, url) => {
+    const id = sessionId(params);
+    await requireViewer(req, url, id);
+    const m = await live.deckStore.media(id, params.name);
+    if (!m) throw new HttpError(404, 'No such picture');
+    sendBytes(req, res, { ...m, version: params.name });
   });
 
   r.post('/api/sessions/:id/code', async (req, res, params) => {
@@ -326,7 +433,10 @@ export async function createApi({ db, live, auth, decks, publicUrl }) {
   action('advance', (id, b) => live.advanceSlide(id, Number(b.dir) < 0 ? -1 : 1));
 
   // ---- scorecards + housekeeping (admin) ----------------------------------
-  r.get('/api/dashboard', async (req, res) => { await requireAdmin(req); sendJson(res, 200, await live.dashboard()); });
+  // Scorecards and reviews: admins see every session, a trainer the sessions they may host.
+  const scopeFor = async (user) => (user.role === 'admin' ? null : new Set((await live.db.all('SELECT * FROM sessions')).map(rowToSession).filter((x) => sessionAllows(x, user)).map((x) => x.id)));
+  r.get('/api/dashboard', async (req, res) => { const user = await requireTrainer(req); sendJson(res, 200, { ...(await live.dashboard({ sessionIds: await scopeFor(user) })), scoped: user.role !== 'admin' }); });
+  r.get('/api/reviews', async (req, res) => { await requireAdmin(req); sendJson(res, 200, { ...(await live.reviews()), scoped: false }); });
   r.delete('/api/participants/:id', async (req, res, params) => { await requireParticipant(req, params.id); sendJson(res, 200, await live.removeParticipant(params.id)); });
   r.delete('/api/interns', async (req, res, params, url) => { await requireAdmin(req); sendJson(res, 200, await live.removeIntern(url.searchParams.get('email'))); });
   r.post('/api/admin/clear-data', async (req, res) => {
@@ -390,7 +500,54 @@ export async function createApi({ db, live, auth, decks, publicUrl }) {
   r.get('/api/sessions/:id/deck', async (req, res, params) => {
     const { session: s } = await requireSession(req, sessionId(params));
     const deck = await live.deckForSession(s);
-    sendJson(res, 200, { deck: { key: deck.key, title: deck.title, synthetic: !!deck.synthetic, sections: deck.sections, slides: flattenDeck(deck) } });
+    const base = flattenDeck(await live.baseDeckForSession(s));
+    const hidden = (s.slideEdits?.hidden || []).filter((i) => base[i]).map((i) => ({ baseIndex: i, title: s.slideEdits.edits?.[i]?.title || base[i].title, sectionTitle: base[i].sectionTitle }));
+    sendJson(res, 200, { deck: { key: deck.key, title: deck.title, synthetic: !!deck.synthetic, kind: deck.kind || (deck.synthetic ? 'content' : 'seed'), file: deck.file || null, rev: await live.deckRevision(s), sections: deck.sections, slides: flattenDeck(deck), hidden } });
+  });
+
+  // ---- per-session slide edits: change a slide's text, remove it, bring it back ------------
+  // `:base` is the slide's index in the deck before edits (slides carry it as baseIndex).
+  r.put('/api/sessions/:id/slides/:base', async (req, res, params) => {
+    const id = sessionId(params);
+    const { user, session: s } = await requireSession(req, id);
+    if (s.status === 'live') throw new HttpError(409, 'Finish the quiz before changing the slides');
+    const base = Number(params.base);
+    const baseFlat = flattenDeck(await live.baseDeckForSession(s));
+    if (!Number.isInteger(base) || base < 0 || base >= baseFlat.length) throw new HttpError(404, `No slide ${params.base} in this deck (it has ${baseFlat.length})`);
+    const b = await readBody(req);
+    const next = { hidden: [...(s.slideEdits?.hidden || [])], edits: { ...(s.slideEdits?.edits || {}) } };
+    let checkpoints = s.checkpoints;
+    if (b.reset === true) delete next.edits[base];
+    else {
+      const e = { ...(next.edits[base] || {}) };
+      if (b.title !== undefined) { const t = String(b.title).trim(); if (!t) throw new HttpError(400, 'A slide needs a title'); e.title = t.slice(0, 200); }
+      if (b.bullets !== undefined) {
+        if (!Array.isArray(b.bullets)) throw new HttpError(400, 'bullets must be a list of strings');
+        e.bullets = b.bullets.map((x) => String(x).trim()).filter(Boolean).slice(0, 40).map((x) => x.slice(0, 600));
+      }
+      if (b.note !== undefined) e.note = String(b.note).trim().slice(0, 4000);
+      if (Object.keys(e).length) next.edits[base] = e;
+    }
+    const wasHidden = next.hidden.includes(base);
+    if (b.hidden === true && !wasHidden) {
+      // Its position in the deck as presented right now, so checkpoints after it can shift.
+      const before = flattenDeck(applySlideEdits(await live.baseDeckForSession(s), s.slideEdits));
+      const at = before.findIndex((sl) => sl.baseIndex === base);
+      if (before.length <= 1) throw new HttpError(400, 'A deck needs at least one slide');
+      next.hidden.push(base);
+      next.hidden.sort((x, y) => x - y);
+      checkpoints = checkpointsAfterHide(checkpoints, at, before.length - 1);
+    } else if (b.hidden === false && wasHidden) {
+      next.hidden = next.hidden.filter((i) => i !== base);
+      const after = flattenDeck(applySlideEdits(await live.baseDeckForSession(s), next));
+      checkpoints = checkpointsAfterRestore(checkpoints, after.findIndex((sl) => sl.baseIndex === base));
+    }
+    const total = flattenDeck(applySlideEdits(await live.baseDeckForSession(s), next)).length;
+    const slideIndex = Math.min(s.slideIndex, total - 1);
+    await db.run('UPDATE sessions SET slide_edits = ?, checkpoints = ?, slide_index = ?, slide_step = CASE WHEN slide_index = ? THEN slide_step ELSE 0 END WHERE id = ?',
+      next.hidden.length || Object.keys(next.edits).length ? JSON.stringify(next) : null, checkpoints === null ? null : JSON.stringify(checkpoints), slideIndex, slideIndex, id);
+    await live.broadcast(id);
+    sendJson(res, 200, { session: await sessionFor(id, user) });
   });
 
   r.get('/api/sessions/:id/results.csv', async (req, res, params) => {

@@ -23,6 +23,15 @@
     .slide .picture { flex: 1; min-height: 0; margin-top: 12px; display: flex; align-items: center; justify-content: center; }
     .slide .picture img { max-width: 100%; max-height: 100%; width: auto; height: auto; border-radius: 6px; box-shadow: 0 24px 60px -30px rgba(0,0,0,0.7); background: #fff; }
     .slide.has-picture .notes { font-size: 14px; padding: 10px 14px; }
+    .slide .picture canvas { max-width: 100%; max-height: 100%; border-radius: 6px; box-shadow: 0 24px 60px -30px rgba(0,0,0,0.7); background: #fff; opacity: 0; transition: opacity 0.15s; }
+    .slide .picture canvas.ready { opacity: 1; }
+    .slide .pics { display: flex; flex-direction: column; gap: 12px; min-height: 0; max-height: 100%; align-self: stretch; overflow: hidden; }
+    .slide .pics img { width: 100%; max-height: 40vh; height: auto; object-fit: contain; border-radius: 6px; background: #fff; align-self: center; box-shadow: 0 20px 50px -30px rgba(0,0,0,0.7); }
+    .slide .pics img:only-child { max-height: 100%; }
+    .slide .body.dense .bullets { font-size: 20px; gap: 9px; }
+    .slide .body.dense.single .bullets { columns: 2; column-gap: 40px; display: block; }
+    .slide .body.dense.single .bullets li { break-inside: avoid; margin-bottom: 9px; }
+    .pdf-error { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; padding: 24px; background: var(--ink-2); border: 1px solid var(--ink-line); border-radius: 10px; }
     .slide .agenda .t { font-size: 22px; } .slide .agenda .s { font-size: 14px; }
     .slide .body.single { grid-template-columns: 1fr; }
     .bullets { margin: 0; padding-left: 26px; display: flex; flex-direction: column; gap: 16px; font-size: 26px; line-height: 1.35; }

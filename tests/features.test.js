@@ -50,7 +50,7 @@ after(async () => { await app.close(); });
 
 test('presentation builds bullet by bullet, then moves to the next slide; back returns to the previous slide fully shown', async () => {
   const { data: { sessions } } = await call('/api/sessions');
-  const s = sessions.find((x) => x.key === 'day18-integration-ai');
+  const s = sessions.find((x) => x.key === 'day18-integration');
   const deck = (await call(`/api/sessions/${s.id}/deck`)).data.deck;
   assert.equal(deck.sections[0].id, 'agenda');
   assert.ok(deck.slides.some((sl) => sl.diagram), 'diagrams attached');
@@ -115,7 +115,7 @@ test('dashboard, participant removal, clear-all and certificates', async () => {
   // clear everything needs the confirmation word
   assert.equal((await call('/api/admin/clear-data', { method: 'POST', body: {} })).status, 400);
   const out = (await call('/api/admin/clear-data', { method: 'POST', body: { confirm: 'CLEAR' } })).data;
-  assert.equal(out.sessionsReset, 8);
+  assert.equal(out.sessionsReset, 14);
   assert.equal((await call(`/api/sessions/${s.id}`)).data.session.status, 'draft');
   assert.equal((await call(`/api/sessions/${s.id}`)).data.questions.length, 15, 'questions are kept');
 });

@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   reveal TEXT NOT NULL DEFAULT 'end',
   block_end INTEGER,
   trainer_emails TEXT NOT NULL DEFAULT '[]',
-  checkpoints TEXT
+  checkpoints TEXT,
+  slide_edits TEXT
 );
 CREATE TABLE IF NOT EXISTS questions (
   id SERIAL PRIMARY KEY,
@@ -92,11 +93,29 @@ CREATE TABLE IF NOT EXISTS roster (
   created_at BIGINT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
+CREATE TABLE IF NOT EXISTS session_decks (
+  session_id INTEGER PRIMARY KEY,
+  kind TEXT NOT NULL,
+  filename TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  pages INTEGER NOT NULL,
+  deck TEXT NOT NULL,
+  file BYTEA,
+  uploaded_by TEXT,
+  uploaded_at BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS deck_media (
+  session_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  mime TEXT NOT NULL,
+  data BYTEA NOT NULL,
+  PRIMARY KEY (session_id, name)
+);
 `;
 
 /** Tables whose INSERT should hand back the new id (run() -> lastInsertRowid). */
 export const ID_TABLES = ['sessions', 'questions', 'participants'];
-export const TABLES = ['trainers', 'trainer_tokens', 'sessions', 'questions', 'participants', 'answers', 'ratings', 'roster', 'meta'];
+export const TABLES = ['trainers', 'trainer_tokens', 'sessions', 'questions', 'participants', 'answers', 'ratings', 'roster', 'meta', 'session_decks', 'deck_media'];
 
 /** "?" placeholders become $1..$n; INSERTs into id tables return the new id. */
 function toPostgres(sql) {
@@ -216,6 +235,10 @@ export async function migrate(db) {
   await add('sessions', 'trainer_emails', "TEXT NOT NULL DEFAULT '[]'");
   // Per-session quiz checkpoints: JSON {"<slide index>": [question ids]}; NULL = the deck's own askAfter values.
   await add('sessions', 'checkpoints', 'TEXT');
+  // Per-session slide edits on top of the deck: JSON {"hidden": [base indexes], "edits": {"<base index>": {title, bullets, note}}}.
+  await add('sessions', 'slide_edits', 'TEXT');
+  // Who created the session (trainers own what they create); NULL for the seeded schedule.
+  await add('sessions', 'owner_email', 'TEXT');
   await add('trainers', 'role', "TEXT NOT NULL DEFAULT 'trainer'");
   await add('questions', 'code', 'TEXT');
   // Roles arrived after the first release: the earliest account becomes the admin.
@@ -243,12 +266,32 @@ export function parseCheckpoints(raw) {
   return out;
 }
 
+/** Slide edits as stored: { hidden: [base indexes], edits: { "<base index>": { title?, bullets?, note? } } }. */
+export function parseSlideEdits(raw) {
+  const empty = { hidden: [], edits: {} };
+  if (!raw) return empty;
+  let p;
+  try { p = JSON.parse(raw); } catch { return empty; }
+  if (!p || typeof p !== 'object') return empty;
+  const hidden = [...new Set((Array.isArray(p.hidden) ? p.hidden : []).map(Number).filter((n) => Number.isInteger(n) && n >= 0))].sort((a, b) => a - b);
+  const edits = {};
+  for (const [k, v] of Object.entries(p.edits && typeof p.edits === 'object' ? p.edits : {})) {
+    if (!Number.isInteger(Number(k)) || !v || typeof v !== 'object') continue;
+    const e = {};
+    if (typeof v.title === 'string') e.title = v.title;
+    if (Array.isArray(v.bullets)) e.bullets = v.bullets.map(String);
+    if (typeof v.note === 'string') e.note = v.note;
+    if (Object.keys(e).length) edits[k] = e;
+  }
+  return { hidden, edits };
+}
+
 /** Row helpers that keep JSON columns tidy. */
 export function rowToSession(r) {
   if (!r) return null;
   return {
     id: r.id, key: r.key, dayNo: r.day_no, date: r.date, week: r.week, module: r.module, title: r.title,
-    subtopics: r.subtopics || '', trainers: JSON.parse(r.trainers || '[]'), trainerEmails: JSON.parse(r.trainer_emails || '[]'),
+    subtopics: r.subtopics || '', trainers: JSON.parse(r.trainers || '[]'), trainerEmails: JSON.parse(r.trainer_emails || '[]'), ownerEmail: r.owner_email || null,
     timeLimitMin: r.time_limit_min, easyS: r.easy_s, mediumS: r.medium_s, hardS: r.hard_s,
     joinCode: r.join_code, status: r.status, slidesKey: r.slides_key,
     currentIndex: r.current_index, questionStartedAt: r.question_started_at, questionEndsAt: r.question_ends_at,
@@ -256,6 +299,7 @@ export function rowToSession(r) {
     slideIndex: r.slide_index, slideStep: r.slide_step ?? 0, reveal: r.reveal || 'end',
     blockEnd: r.block_end ?? null,
     checkpoints: parseCheckpoints(r.checkpoints),
+    slideEdits: parseSlideEdits(r.slide_edits),
   };
 }
 

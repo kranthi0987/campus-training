@@ -1,4 +1,4 @@
-import { $, $$, api, store, html, raw, connect, secondsLeft, serverNow, fmtClock, pill, ring, starIcon, toast, initials } from '/app.js';
+import { $, $$, api, store, html, raw, connect, secondsLeft, serverNow, fmtClock, pill, ring, starIcon, toast, initials, pdfjs } from '/app.js';
 import { renderDiagram } from '/diagrams.js';
 let lastSlideIndex = null, lastSlideStep = null;
 
@@ -28,7 +28,7 @@ function render() {
 
   if (s.status === 'live' && q) return renderQuestion(s, q, me, name);
   if (s.status === 'ended') return renderEnded(s, me, name);
-  if (slide) return renderSlide(s, slide, name);
+  if (slide) return renderSlide(s, slide, name, state.deck);
   return renderWaiting(s, name);
 }
 
@@ -60,18 +60,47 @@ function renderWaiting(s, name) {
     <div class="footer"><span>${name}</span><a href="/" class="faint" style="font-size: 12px;">Not you?</a></div>`;
 }
 
-function renderSlide(s, slide, name) {
+// Pictures and PDF pages from an uploaded deck are private to the session: the phone fetches
+// them with its participant token.
+const withToken = (u) => `${u}${u.includes('?') ? '&' : '?'}token=${encodeURIComponent(store.token)}`;
+let pdfDoc = null; // { url, promise }
+async function drawPdfPage(fileUrl, pageNo) {
+  const canvas = $('#pdfCanvas');
+  if (!canvas) return;
+  try {
+    if (!pdfDoc || pdfDoc.url !== fileUrl) pdfDoc = { url: fileUrl, promise: pdfjs().then((lib) => lib.getDocument({ url: withToken(fileUrl) }).promise) };
+    const page = await (await pdfDoc.promise).getPage(pageNo);
+    if ($('#pdfCanvas') !== canvas) return;
+    const width = canvas.parentElement.getBoundingClientRect().width;
+    const dpr = window.devicePixelRatio || 1;
+    const viewport = page.getViewport({ scale: (width / page.getViewport({ scale: 1 }).width) * dpr });
+    canvas.width = Math.floor(viewport.width); canvas.height = Math.floor(viewport.height);
+    canvas.style.width = '100%'; canvas.style.height = 'auto';
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+  } catch (err) {
+    const holder = canvas.parentElement;
+    if (holder) holder.innerHTML = html`<div class="small muted">Page ${pageNo} is on the projector. (${err.message})</div>`.value;
+  }
+}
+
+function renderSlide(s, slide, name, deck) {
   const changed = lastSlideIndex !== slide.index;
   const newest = !changed && lastSlideStep !== null && slide.step > lastSlideStep ? slide.step - 1 : -1;
   lastSlideIndex = slide.index; lastSlideStep = slide.step;
   const cls = (k) => (k < slide.step ? (k === newest ? 'reveal' : '') : 'pending');
+  const pics = (slide.pictures || []).map(withToken);
+  const picImg = (u) => html`<img src="${u}" alt="" style="width: 100%; height: auto; border-radius: 8px; background: #fff; display: block;">`;
   const body = slide.image
     ? html`<img src="${slide.image}" alt="${slide.title}" style="width: 100%; height: auto; border-radius: 8px; background: #fff; display: block;">
       ${slide.bullets.length ? html`<ul class="bullets" style="font-size: 14px; gap: 6px; margin-top: 6px;">${slide.bullets.map((b) => html`<li>${b}</li>`)}</ul>` : ''}`
+    : slide.pdfPage
+    ? html`<div style="border-radius: 8px; overflow: hidden; background: #fff; min-height: 120px;"><canvas id="pdfCanvas" style="display: block; width: 100%;"></canvas></div>`
+    : pics.length && !slide.bullets.length
+    ? picImg(pics[0])
     : slide.agenda
     ? html`<div class="agenda" style="grid-template-columns: 1fr;">${slide.agenda.map((a, k) => html`<div class="item ${cls(k)}"><span class="n">${k + 1}</span><div><div class="t">${a.title}</div><div class="s">${a.first.join(' · ')}</div></div></div>`)}</div>`
     : html`<ul class="bullets">${slide.bullets.map((b, k) => html`<li class="${cls(k)}">${b}</li>`)}</ul>
-      ${slide.diagram ? raw(renderDiagram(slide.diagram, { compact: true })) : slide.code ? html`<pre class="code" style="font-size: 13px;">${slide.code.text}</pre>` : ''}`;
+      ${slide.diagram ? raw(renderDiagram(slide.diagram, { compact: true })) : slide.code ? html`<pre class="code" style="font-size: 13px;">${slide.code.text}</pre>` : pics.length ? html`<div class="stack" style="gap: 8px; margin-top: 8px;">${pics.slice(0, 2).map(picImg)}</div>` : ''}`;
   app.innerHTML = html`
     ${header(s, `<span class="pill neutral">Slide ${slide.index + 1} / ${slide.total}</span>`)}
     <div class="stack ${changed ? 'slidein' : ''}" style="margin-top: 28px; gap: 14px;">
@@ -80,6 +109,7 @@ function renderSlide(s, slide, name) {
       ${body}
     </div>
     <div class="footer"><span>${name}</span><span>Following the trainer's slides</span></div>`;
+  if (slide.pdfPage && deck?.file) drawPdfPage(deck.file, slide.pdfPage);
 }
 
 function renderQuestion(s, q, me, name) {
