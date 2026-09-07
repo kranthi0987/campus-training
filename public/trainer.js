@@ -257,8 +257,38 @@ function statusLabel(s) { return { draft: 'Draft', lobby: 'Lobby open', live: 'L
 let dashView = 'daily';
 let dailySessionId = null;
 
+/** A trainer's scorecards: one scoreboard per session they host, nothing roster-wide. */
+function renderTrainerScorecards(sessions, interns) {
+  const cert = (r, s) => (r && s.status === 'ended' ? html`<a class="tiny" href="/api/participants/${r.participantId}/certificate.svg" title="Download certificate" style="text-decoration: none; margin-left: 6px;">🎓</a>` : '');
+  const board = (s) => {
+    const rows = interns.map((it) => ({ it, r: it.sessions[s.id] })).filter((x) => x.r).sort((a, b) => b.r.score - a.r.score || b.r.correct - a.r.correct || a.it.name.localeCompare(b.it.name));
+    let rank = 0, prev = null;
+    rows.forEach((row, i) => { if (row.r.score !== prev) { rank = i + 1; prev = row.r.score; } row.rank = rank; });
+    return html`<div class="card" style="padding: 0; overflow: auto;">
+      <div class="row between wrap" style="padding: 14px 16px; border-bottom: 1px solid var(--line-soft); gap: 8px;">
+        <div class="row wrap" style="gap: 10px; align-items: baseline;"><span class="tiny muted">Day ${s.dayNo ?? '·'} · ${fmtDate(s.date)}</span><h3>${s.title}</h3><span class="pill ${s.status}">${statusLabel(s.status)}</span></div>
+        <div class="row wrap" style="gap: 14px;"><span class="small muted">${rows.length} joined · ${s.questionCount} questions${s.avgScore !== null && rows.length ? ` · average ${s.avgScore} pts` : ''}</span><a class="btn sm" href="/host/${s.id}" target="_blank">Host screen</a></div>
+      </div>
+      ${rows.length ? html`<table class="table">
+        <thead><tr><th class="num">Rank</th><th>Intern</th><th>Email</th><th class="num">Correct</th><th class="num">Points</th></tr></thead>
+        <tbody>${rows.map(({ it, r, rank }) => html`<tr>
+          <td class="num display" style="font-weight: 700; color: var(--faint);">${rank}</td>
+          <td style="font-weight: 600;">${it.name}</td><td class="small muted">${it.email}</td>
+          <td class="num" title="${r.answered} answered">${r.correct} / ${s.questionCount}</td><td class="num display" style="font-weight: 800;">${r.score}${cert(r, s)}</td>
+        </tr>`)}</tbody>
+      </table>` : html`<p class="small muted" style="padding: 16px;">Nobody has joined this session yet.</p>`}
+    </div>`;
+  };
+  shell(html`
+    <div class="row between wrap" style="margin-bottom: 20px; gap: 12px;">
+      <div class="stack" style="gap: 4px;"><h1 style="font-size: 26px;">Scorecards</h1><p class="muted small">The scoreboard of each session you host. Points and ranks for the whole programme are on the admin's view.</p></div>
+    </div>
+    <div class="stack" style="gap: 16px;">${sessions.length ? sessions.map(board) : html`<div class="card muted small">No sessions are assigned to you yet.</div>`}</div>`);
+}
+
 async function renderDashboard() {
-  const { sessions, interns, weeks } = await api('/api/dashboard');
+  const { sessions, interns, weeks, scoped } = await api('/api/dashboard');
+  if (scoped) return renderTrainerScorecards(sessions, interns);
   const run = sessions.filter((s) => s.participantCount > 0);
   const totalPoints = interns.reduce((a, i) => a + i.total, 0);
   const attendances = interns.reduce((a, i) => a + i.attended, 0);

@@ -138,8 +138,9 @@ kept in `data/.session-secret`, so sign-ins survive restarts either way).
    number of ratings across sessions, then per session a table of who gave which trainer
    how many stars and their comment. Trainers see the ratings for their own session on the
    host screen's finished view, which lists the same breakdown as the ratings arrive.
-   Scorecards are open to trainers too, limited to their own sessions (totals and ranks
-   count only those); admins keep the full view and the clearing controls.
+   Trainers get a simpler Scorecards page: one scoreboard per session they host (rank,
+   correct, points, certificate link), nothing across the programme; admins keep the full
+   daily / weekly / overall view and the clearing controls.
 11. **Scorecards** (`/trainer` → Scorecards): *Daily* ranks everyone for one session (with
    who did not join), *Weekly* totals points per training week, *Overall* shows every
    session side by side with attendance and totals. CSV export covers all three. *Clear*
