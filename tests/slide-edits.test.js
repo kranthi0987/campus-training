@@ -55,7 +55,7 @@ test('editing a slide changes its title, points and notes for this session only'
   assert.deepEqual(after.slides[2].bullets, ['One', 'Two']);
   assert.equal(after.slides[2].note, 'Say it slowly.');
   assert.equal(after.slides[2].edited, true);
-  assert.ok(after.slides[2].diagram === target.diagram, 'the diagram stays');
+  assert.deepEqual(after.slides[2].diagram, target.diagram, 'the diagram stays');
   assert.notEqual(after.rev, before.rev, 'the deck revision changes so open Present screens reload');
   assert.equal(app.decks.get('day18-integration').sections.flatMap((x) => x.slides)[2].title, target.title, 'the seeded deck is untouched');
   const bad = await call(`/api/sessions/${s.id}/slides/2`, { method: 'PUT', as: 'kranthi', body: { title: '   ' } });

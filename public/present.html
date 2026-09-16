@@ -36,6 +36,16 @@
     .slide .body.single { grid-template-columns: 1fr; }
     .bullets { margin: 0; padding-left: 26px; display: flex; flex-direction: column; gap: 16px; font-size: 26px; line-height: 1.35; }
     .bullets li::marker { color: var(--amber); }
+    .bullets li { padding-left: 8px; border-radius: 8px; }
+    .bullets .lead { color: var(--amber); font-weight: 700; }
+    /* The point that has just been revealed slides in and glows for a moment, so the room can find it. */
+    @keyframes pointglow { 0% { background: rgba(242, 176, 75, 0.22); box-shadow: inset 4px 0 0 var(--amber); } 100% { background: transparent; box-shadow: inset 0 0 0 transparent; } }
+    .bullets li.reveal { animation: reveal 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both, pointglow 1.8s ease-out 0.2s both; }
+    /* Diagrams and code ease in with the slide. */
+    @keyframes diagin { from { opacity: 0; transform: translateY(14px) scale(0.98); } to { opacity: 1; transform: none; } }
+    .slide.slidein .diagram, .slide.slidein pre.code { animation: diagin 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.15s both; }
+    .slide .diagram.timeline, .slide .diagram.token { align-self: center; }
+    @media (prefers-reduced-motion: reduce) { .bullets li.reveal, .slide.slidein .diagram, .slide.slidein pre.code { animation: none; } }
     pre.code { font-size: 18px; max-height: 100%; }
     .bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 24px; border-top: 1px solid var(--ink-line); }
     .notes { background: var(--ink-2); border: 1px solid var(--ink-line); border-radius: 10px; padding: 14px 16px; font-size: 15px; color: #c9cfdc; line-height: 1.5; }

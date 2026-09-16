@@ -1,4 +1,4 @@
-import { $, $$, api, html, raw, connect, toast, ring, secondsLeft, initials, pdfjs } from '/app.js';
+import { $, $$, api, html, raw, point, connect, toast, ring, secondsLeft, initials, pdfjs } from '/app.js';
 import { renderDiagram } from '/diagrams.js';
 
 const id = Number(location.pathname.split('/').pop());
@@ -214,7 +214,7 @@ function render() {
     const step = Math.min(state.slide?.step ?? 0, steps);
     const changed = lastIndex !== i;
     const newest = !changed && lastStep !== null && step > lastStep ? step - 1 : (changed ? -1 : -1);
-    const bullet = (b, k) => html`<li class="${k < step ? (k === newest ? 'reveal' : '') : 'pending'}">${b}</li>`;
+    const bullet = (b, k) => html`<li class="${k < step ? (k === newest ? 'reveal' : '') : 'pending'}">${point(b)}</li>`;
     let body;
     const pics = sl.pictures || [];
     if (sl.image) {

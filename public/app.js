@@ -18,6 +18,12 @@ export function html(strings, ...vals) {
 class Raw { constructor(value) { this.value = value; } toString() { return this.value; } }
 export const raw = (value) => (value instanceof Raw ? value : new Raw(String(value ?? '')));
 
+/** A slide point. "Label: the rest" gets its label set apart so the eye catches the key term. */
+export function point(text) {
+  const m = /^([^:.]{2,32}):\s+(\S.*)$/.exec(String(text ?? ''));
+  return m ? new Raw(`<b class="lead">${esc(m[1])}:</b> ${esc(m[2])}`) : new Raw(esc(text));
+}
+
 export const store = {
   get token() { return localStorage.getItem('dq_token') || ''; },
   set token(v) { v ? localStorage.setItem('dq_token', v) : localStorage.removeItem('dq_token'); },

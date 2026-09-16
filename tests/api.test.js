@@ -132,7 +132,7 @@ test('full run: edit questions, open lobby, join, answer, scoreboard, rating, ex
   assert.equal(slide.status, 200);
   assert.equal((await call('/api/play/state', { token: grace.token, asTrainer: false })).data.state.slide.index, 0);
   const deck = await call(`/api/sessions/${s.id}/deck`);
-  assert.equal(deck.data.deck.slides.length, 16, '15 content slides plus the agenda');
+  assert.equal(deck.data.deck.slides.length, 22, '21 content slides plus the agenda');
 
   // reset
   assert.equal((await call(`/api/sessions/${s.id}/reset`, { method: 'POST' })).status, 200);

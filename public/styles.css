@@ -167,6 +167,7 @@ pre.code { margin: 0; background: #001a2b; color: #dfe9f2; border: 1px solid var
 .diagram { display: flex; flex-direction: column; gap: 8px; }
 .diagram svg { width: 100%; height: auto; display: block; }
 .diagram .cap { font-size: 14px; color: var(--on-ink-muted); line-height: 1.4; }
+.bullets .lead { color: var(--amber); font-weight: 700; }
 @media (prefers-reduced-motion: reduce) { .reveal, .slidein, .pop { animation: none; } }
 
 @media (max-width: 720px) {

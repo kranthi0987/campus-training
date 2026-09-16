@@ -1,4 +1,4 @@
-import { $, $$, api, store, html, raw, connect, secondsLeft, serverNow, fmtClock, pill, ring, starIcon, toast, initials, pdfjs } from '/app.js';
+import { $, $$, api, store, html, raw, point, connect, secondsLeft, serverNow, fmtClock, pill, ring, starIcon, toast, initials, pdfjs } from '/app.js';
 import { renderDiagram } from '/diagrams.js';
 let lastSlideIndex = null, lastSlideStep = null;
 
@@ -99,7 +99,7 @@ function renderSlide(s, slide, name, deck) {
     ? picImg(pics[0])
     : slide.agenda
     ? html`<div class="agenda" style="grid-template-columns: 1fr;">${slide.agenda.map((a, k) => html`<div class="item ${cls(k)}"><span class="n">${k + 1}</span><div><div class="t">${a.title}</div><div class="s">${a.first.join(' · ')}</div></div></div>`)}</div>`
-    : html`<ul class="bullets">${slide.bullets.map((b, k) => html`<li class="${cls(k)}">${b}</li>`)}</ul>
+    : html`<ul class="bullets">${slide.bullets.map((b, k) => html`<li class="${cls(k)}">${point(b)}</li>`)}</ul>
       ${slide.diagram ? raw(renderDiagram(slide.diagram, { compact: true })) : slide.code ? html`<pre class="code" style="font-size: 13px;">${slide.code.text}</pre>` : pics.length ? html`<div class="stack" style="gap: 8px; margin-top: 8px;">${pics.slice(0, 2).map(picImg)}</div>` : ''}`;
   app.innerHTML = html`
     ${header(s, `<span class="pill neutral">Slide ${slide.index + 1} / ${slide.total}</span>`)}
